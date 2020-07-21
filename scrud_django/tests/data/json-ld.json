@@ -1,0 +1,16 @@
+{
+    "url": {
+        "@id": "https://api.openteams.com/json-ld/Envelope/url",
+        "https://www.w3.org/TR/rdf-schema/#ch_subclassof":
+            "https://www.w3.org/TR/HTTP-in-RDF10/#absoluteURIProperty"
+    },
+    "last_modified": {
+        "@id": "https://api.openteams.com/json-ld/Envelope/last_modified"
+    },
+    "etag": {
+        "@id": "https://api.openteams.com/json-ld/Envelope/etag"
+    },
+    "content": {
+        "@id": "https://api.openteams.com/json-ld/Envelope/content"
+    }
+}
