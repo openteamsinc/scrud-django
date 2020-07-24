@@ -10,7 +10,7 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
+  tests:
 
     runs-on: ubuntu-latest
     strategy:
@@ -31,7 +31,6 @@ jobs:
         activate-environment: scrud-django
         environment-file: docker/environment-dev.yml
         channels: conda-forge
-        channel-priority: strict
 
     - name: install dependencies
       shell: bash -l {0}

@@ -1,3 +1,4 @@
+name: scrud-django
 channels:
   - conda-forge
 dependencies:
