@@ -1,0 +1,21 @@
+{
+    "$id": "https://api.openteams.com/json-schema/Envelope",
+    "$schema": "http://json-schema.org/draft-04/schema",
+    "title": "Resource Envelope",
+    "description": "A resource wrapper providing the url and http caching headers for a contained resource",
+    "properties": {
+        "url": {
+            "type": "string",
+            "format": "uri"
+        },
+        "last_modified": {
+            "type": "string"
+        },
+        "etag": {
+            "type": "string"
+        },
+        "content": {
+            "type": ["object", "array", "string", "number", "boolean"]
+        }
+    }
+}

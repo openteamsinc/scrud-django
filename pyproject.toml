@@ -1,0 +1,9 @@
+
+[tool.black]
+line-length = 79
+skip-string-normalization = true
+target-version = ["py36", "py37", "py38"]
+
+
+[settings]
+known_third_party = ["django", "dotenv", "factory", "pytest", "rest_framework", "safetydance", "safetydance_django", "safetydance_test", "setuptools", "solar_theme"]
