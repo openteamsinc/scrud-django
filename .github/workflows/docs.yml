@@ -31,11 +31,10 @@ jobs:
     - name: Push documentation to GitHub Pages
       env:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        github_app: ${{ secrets.GITHUB_APP }}
       run: |
         export REPO_PATH=$(pwd)
         cd /tmp/
-        git clone https://${github_app}:${github_token}@github.com/openteamsinc/scrud-django.git --branch=gh-pages gh-pages
+        git clone https://scrud_django_app:${github_token}@github.com/openteamsinc/scrud-django.git --branch=gh-pages gh-pages
         cd gh-pages
         cp -R ${REPO_PATH}/docs/_build/html .
         git add .
