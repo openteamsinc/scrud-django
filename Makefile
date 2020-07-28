@@ -30,7 +30,13 @@ BUILDDIR = docs/_build
 build_doc:
 	rm -rf docs/_build/*
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)"
+
+
+run_doc:
+	rm -rf docs/_build/*
+	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)"
 	$(BROWSER) docs/_build/index.html
+
 
 develop:
 	pip install ".[dev]"
