@@ -9,13 +9,15 @@ from .steps import *  # noqa: F403, F401
 @scripted_test
 def test_resource():
     """Resource test."""
-    Given.an_instance_named('resource', ResourceFactory())
-    Then.is_valid_resource('resource')
+    step_name = 'resource'
+    Given.an_instance_named(step_name, ResourceFactory())
+    Then.is_valid_resource(step_name)
 
 
 @pytest.mark.django_db
 @scripted_test
 def test_resource_type():
-    """Resource test."""
-    Given.an_instance_named('resource_type', ResourceTypeFactory())
-    Then.is_valid_resource_type('resource_type')
+    """Resource type test."""
+    step_name = 'resource_type'
+    Given.an_instance_named(step_name, ResourceTypeFactory())
+    Then.is_valid_resource_type(step_name)

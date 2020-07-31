@@ -133,3 +133,6 @@ rever/
 
 # IDEs
 .vscode
+
+# sqlite
+db.sqlite*

@@ -6,4 +6,8 @@ target-version = ["py36", "py37", "py38"]
 
 
 [settings]
-known_third_party = ["django", "dotenv", "factory", "pytest", "rest_framework", "safetydance", "safetydance_django", "safetydance_test", "setuptools", "solar_theme"]
+known_third_party = ["django", "dotenv", "factory", "jsonfield", "pytest", "rest_framework", "safetydance", "safetydance_django", "safetydance_test", "setuptools", "solar_theme", "yaml"]
+
+[tool.isort]
+multi_line_output = 3
+include_trailing_comma = true

@@ -2,6 +2,7 @@ name: scrud-django
 channels:
   - conda-forge
 dependencies:
+  # production
   - python 3.7
   - pip
   - django
@@ -31,6 +32,8 @@ dependencies:
   - pytest
   - pytest-cov
   - pip:
+    # production
+    - django-jsonfield
     # tools
     - django-extensions
     # tests
