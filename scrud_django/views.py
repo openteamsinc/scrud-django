@@ -78,11 +78,15 @@ class ResourceViewSet(viewsets.ModelViewSet):
             ResourceType, slug=self.resource_type_name
         )
 
-        instance = Resource.objects.filter(resource_type=resource_type)
-        serializer = self.serializer_class(instance=instance, many=True)
-        page = self.get_paginated_response(serializer.data)
+        queryset = Resource.objects.filter(resource_type=resource_type)
+        page = self.paginate_queryset(queryset)
 
-        return Response(page)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return Response(self.get_paginated_response(serializer.data))
+
+        serializer = self.serializer_class(instance=queryset, many=True)
+        return Response(serializer.data)
 
 
 # JSON-SCHEMA
