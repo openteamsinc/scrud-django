@@ -7,3 +7,5 @@ dependencies:
   - djangorestframework
   - psycopg2
   - python-dotenv
+  -pip:
+    - django-jsonfield

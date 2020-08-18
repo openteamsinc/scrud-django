@@ -4,7 +4,7 @@ from uuid import uuid4
 import factory
 from django.contrib.auth.models import User
 
-from ..models import Resource, ResourceType
+from scrud_django.models import Resource, ResourceType
 
 
 def fake_url():
@@ -33,9 +33,13 @@ class ResourceTypeFactory(factory.django.DjangoModelFactory):
         model = ResourceType
 
     type_uri = factory.LazyFunction(fake_url)
+    slug = factory.LazyFunction(lambda: uuid4().hex)
 
     schema = factory.LazyFunction(fake_resource)
+    schema_uri = None
+
     context = factory.LazyFunction(fake_resource)
+    context_uri = None
 
 
 class ResourceFactory(factory.django.DjangoModelFactory):
