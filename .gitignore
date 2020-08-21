@@ -136,3 +136,7 @@ rever/
 
 # sqlite
 db.sqlite*
+
+# vim swapfiles
+.*.sw*
+*.sw*
