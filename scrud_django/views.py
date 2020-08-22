@@ -15,7 +15,7 @@ from scrud_django.registration import ResourceRegistration
 
 class ResourceViewSet(viewsets.ModelViewSet):
     queryset = Resource.objects.all()
-    serializer_class = serializers.ResourceSerializer
+    serializer_class = serializers.ResourceEnvelopeSerializer
     pagination_class = StandardResultsSetPagination
 
     # scrud variable

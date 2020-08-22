@@ -115,14 +115,16 @@ class ResourceTypeRegistration:
                 path(
                     f'{resource_type.slug}/',
                     scrud_list,
-                    name=f'{resource_type.slug}-list',
+                    # name=f'{resource_type.slug}-list',
+                    name=resource_type.route_name_list(),
                 ),
             )
             urls.append(
                 path(
                     f'{resource_type.slug}/<str:slug>/',
                     scrud_detail,
-                    name=f'{resource_type.slug}-detail',
+                    # name=f'{resource_type.slug}-detail',
+                    name=resource_type.route_name_detail(),
                 )
             )
         self.urls = urls

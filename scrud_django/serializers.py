@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from rest_framework.reverse import reverse
 
 from scrud_django import models
 
@@ -9,13 +10,23 @@ class ResourceSerializer(serializers.Serializer):
         fields = ['id', 'content', 'resource_type', 'modified_at', 'etag']
 
     def to_representation(self, instance):
-        # result = super().to_representation(instance)
+        return instance.content
+
+
+class ResourceEnvelopeSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Resource
+        fields = ['id', 'content', 'resource_type', 'modified_at', 'etag']
+        content = ResourceSerializer()
+
+    def to_representation(self, instance):
         return {
-            'id': instance.id,
-            'content': instance.content,
-            'resource_type': instance.resource_type.type_uri,
-            'modified_at': instance.modified_at.isoformat(),
+            'href': reverse(
+                instance.resource_type.route_name_detail(), args=[instance.id]
+            ),
+            'last_modified': instance.modified_at.isoformat(),
             'etag': instance.etag,
+            'content': self.Meta.content.to_representation(instance),
         }
 
 

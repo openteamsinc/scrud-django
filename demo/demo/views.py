@@ -28,7 +28,7 @@ class ScrudfulView(APIView):
         raise NotImplementedError()
 
     def context_link_rel(self, request):
-        raise "context"
+        return "context"
 
     def do_get(self, request, format=None):
         raise NotImplementedError()

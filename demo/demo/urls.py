@@ -12,9 +12,13 @@ registration_file = os.path.join(
 
 urlpatterns = [
     path("services", views.ServiceCatalog.as_view()),
-    path("json-schema/PartnerProfile", views.PartnerProfileSchema.as_view()),
-    path("json-ld/PartnerProfile", views.PartnerProfileContext.as_view()),
-    path("examples/partner-profile", views.ExamplePartnerProfile.as_view()),
+    path(
+        "demo/json-schema/PartnerProfile", views.PartnerProfileSchema.as_view()
+    ),
+    path("demo/json-ld/PartnerProfile", views.PartnerProfileContext.as_view()),
+    path(
+        "demo/examples/PartnerProfile", views.ExamplePartnerProfile.as_view()
+    ),
 ]
 
 registration = ResourceTypeRegistration(registration_file)

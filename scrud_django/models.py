@@ -36,6 +36,12 @@ class ResourceType(models.Model):
     )
     context_uri = models.URLField(null=True)
 
+    def route_name_list(self):
+        return f"{self.slug}-list"
+
+    def route_name_detail(self):
+        return f"{self.slug}-detail"
+
 
 class Resource(models.Model):
     # The actual JSON content for this resource
