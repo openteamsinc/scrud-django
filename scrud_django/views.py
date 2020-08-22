@@ -15,7 +15,7 @@ from scrud_django.registration import ResourceRegistration
 
 class ResourceViewSet(viewsets.ModelViewSet):
     queryset = Resource.objects.all()
-    serializer_class = serializers.ResourceEnvelopeSerializer
+    serializer_class = serializers.ResourceSerializer
     pagination_class = StandardResultsSetPagination
 
     # scrud variable
@@ -40,7 +40,7 @@ class ResourceViewSet(viewsets.ModelViewSet):
         instance = ResourceRegistration.register(
             content=request.data, register_type=self.resource_type_name
         )
-        serializer = self.serializer_class(instance=instance, many=False)
+        serializer = self.get_serializer(instance=instance, many=False)
         return Response(serializer.data)
 
     def update(self, request, slug: str):
@@ -50,7 +50,7 @@ class ResourceViewSet(viewsets.ModelViewSet):
             register_type=self.resource_type_name,
             slug=slug,
         )
-        serializer = self.serializer_class(instance=instance, many=False)
+        serializer = self.get_serializer(instance=instance, many=False)
         return Response(serializer.data)
 
     def destroy(self, request, slug: str):
@@ -69,7 +69,7 @@ class ResourceViewSet(viewsets.ModelViewSet):
             Resource, resource_type=resource_type, pk=int(slug)
         )
 
-        serializer = self.serializer_class(instance=instance, many=False)
+        serializer = self.get_serializer(instance=instance, many=False)
         return Response(serializer.data)
 
     def list(self, request):
@@ -85,7 +85,7 @@ class ResourceViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(page, many=True)
             return Response(self.get_paginated_response(serializer.data))
 
-        serializer = self.serializer_class(instance=queryset, many=True)
+        serializer = self.get_serializer(instance=queryset, many=True)
         return Response(serializer.data)
 
 
