@@ -28,18 +28,22 @@ def serialize_page(resources):
         'page_count': 1,
         'next': None,
         'previous': None,
-        'content': [serialize_resource(resource) for resource in resources],
+        'content': [
+            serialize_resource_envelope(resource) for resource in resources
+        ],
+    }
+
+
+def serialize_resource_envelope(resource):
+    return {
+        'content': resource.content,
+        'last_modified': resource.modified_at.isoformat(),
+        'etag': resource.etag,
     }
 
 
 def serialize_resource(resource):
-    return {
-        'id': resource.id,
-        'content': resource.content,
-        'resource_type': resource.resource_type.type_uri,
-        'modified_at': resource.modified_at.isoformat(),
-        'etag': resource.etag,
-    }
+    return resource.content
 
 
 def force_resource_type_registration():
@@ -103,12 +107,7 @@ def test_resource_post(admin_login, partner_profile_post_data):
     url = reverse(RESOURCE_ENDPOINT_LIST_NAME)
     assert url == '/partner-profiles/'
 
-    serialized_data = {
-        'id': 1,
-        'content': partner_profile_post_data,
-        'etag': 'something',
-        'modified_at': 'some date',
-    }
+    serialized_data = partner_profile_post_data
 
     Given.http.force_authenticate(admin_login)
     And.http.post(
@@ -137,12 +136,7 @@ def test_resource_put(admin_login, partner_profile_post_data):
     partner_profile_put_data['slug'] = 'test-put'
     partner_profile_put_data['display_name'] = 'Test PUT'
 
-    serialized_data = {
-        'id': 1,
-        'content': partner_profile_put_data,
-        'etag': 'something',
-        'modified_at': 'some date',
-    }
+    serialized_data = partner_profile_put_data
 
     url = reverse(RESOURCE_ENDPOINT_DETAIL_NAME, kwargs={'slug': resource.id})
     assert url == f'/partner-profiles/{resource.id}/'

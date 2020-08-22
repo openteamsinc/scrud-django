@@ -67,23 +67,29 @@ def check_registration_results(name: str, result):
     assert result.schema_uri == expected['json_schema_url']
 
 
-def resource_json_is(resource_data: dict):
-    assert 'id' in resource_data
-    assert isinstance(resource_data['id'], int)
+def resource_envelope_json_is(resource_data: dict):
+    assert 'href' in resource_data
+    assert isinstance(resource_data['href'], str)
 
-    assert 'content' in resource_data
-    assert isinstance(resource_data['content'], dict)
-
-    assert 'modified_at' in resource_data
-    assert isinstance(resource_data['modified_at'], str)
+    assert 'last_modified' in resource_data
+    assert isinstance(resource_data['last_modified'], str)
 
     assert 'etag' in resource_data
     assert isinstance(resource_data['etag'], str)
 
+    assert 'content' in resource_data
+    assert isinstance(resource_data['content'], dict)
+
     response = http_response.json()
-
-    for field in ['id', 'content']:
-        assert response[field] == resource_data[field]
+    assert response["content"] == resource_data["content"]
 
 
+def resource_json_is(resource_data):
+    response = http_response.json()
+    assert response == resource_data
+
+
+resource_envelope_json_is = step_extension(
+    f=resource_envelope_json_is, target_type=Http
+)
 resource_json_is = step_extension(f=resource_json_is, target_type=Http)
