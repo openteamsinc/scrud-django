@@ -1,4 +1,7 @@
+from datetime import timezone
+
 from django.db.models import Manager
+from django.utils.http import http_date, quote_etag
 from rest_framework import serializers
 from rest_framework.reverse import reverse_lazy
 
@@ -23,14 +26,17 @@ class ResourceSerializer(serializers.Serializer):
         if not envelope:
             return instance.content
         request = self._context["request"]
+        last_modified = http_date(
+            instance.modified_at.replace(tzinfo=timezone.utc).timestamp()
+        )
         return {
             'href': reverse_lazy(
                 instance.resource_type.route_name_detail(),
                 args=[instance.id],
                 request=request,
             ),
-            'last_modified': instance.modified_at.isoformat(),
-            'etag': instance.etag,
+            'last_modified': last_modified,
+            'etag': quote_etag(instance.etag),
             'content': instance.content,
         }
 
