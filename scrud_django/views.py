@@ -1,10 +1,10 @@
-from calendar import timegm
+from datetime import timezone
 from functools import wraps
 from typing import Optional
 
 from django.shortcuts import get_object_or_404
 from django.utils.cache import get_conditional_response
-from django.utils.http import quote_etag
+from django.utils.http import http_date, quote_etag
 from rest_framework import status, viewsets
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -40,14 +40,17 @@ def scrudful(
         @wraps(view_method)
         def inner(self, request, *args, **kwargs):
             if request.method in ("PUT", "DELETE"):
-                if not request.META.get(
+                missing_required_headers = []
+                if etag_func and not request.META.get("HTTP_IF_MATCH"):
+                    missing_required_headers.append("If-Match")
+                if last_modified_func and not request.META.get(
                     "HTTP_IF_UNMODIFIED_SINCE"
-                ) or not request.META.get("HTTP_IF_MATCH"):
+                ):
+                    missing_required_headers.append("If-Unmodified-Since")
+                if missing_required_headers:
                     # TODO Define standard error json
                     response = Response(
-                        {
-                            "missing-required-headers": "If-Match and If-Unmodified-Since headers are required."  # noqa
-                        },
+                        {"missing-required-headers": missing_required_headers},
                         status=400,
                     )
                     return response
@@ -56,15 +59,27 @@ def scrudful(
             def get_last_modified():
                 if last_modified_func:
                     last_modified = last_modified_func(
-                        request, *args, **kwargs
+                        self, request, *args, **kwargs
                     )
                     if last_modified:
-                        return timegm(last_modified.utctimetuple())
+                        return http_date(
+                            last_modified.replace(
+                                tzinfo=timezone.utc
+                            ).timestamp()
+                        )
                 return None
 
-            etag = etag_func(request, *args, **kwargs) if etag_func else None
-            etag = quote_etag(etag) if etag else None
-            last_modified = get_last_modified()
+            if request.method not in ("POST", "OPTIONS"):
+                etag = (
+                    etag_func(self, request, *args, **kwargs)
+                    if etag_func
+                    else None
+                )
+                etag = quote_etag(etag) if etag else None
+                last_modified = get_last_modified()
+            else:
+                etag = None
+                last_modified = "Come on!"
             response = get_conditional_response(
                 request, etag=etag, last_modified=last_modified
             )
@@ -142,10 +157,14 @@ class ResourceViewSet(viewsets.ModelViewSet):
     resource_type_name: Optional[str] = None
 
     class Meta:
-        def etag_func(request, *args, **kwargs):
-            return "XXXX"
+        def etag_func(view_instance, request, slug: str):
+            instance = view_instance.get_instance(request, slug)
+            return instance.etag
 
-        # last_modified_func =
+        def last_modified_func(view_instance, request, slug: str):
+            instance = view_instance.get_instance(request, slug)
+            return instance.modified_at
+
         schema_link_or_func = "schema-tbd"
         context_link_or_func = "context-tbd"
 
@@ -169,6 +188,15 @@ class ResourceViewSet(viewsets.ModelViewSet):
         else:
             permission_classes = [AllowAny]
         return [permission() for permission in permission_classes]
+
+    def get_instance(self, request, slug: str):
+        resource_type = get_object_or_404(
+            ResourceType, slug=self.resource_type_name
+        )
+        instance = get_object_or_404(
+            Resource, resource_type=resource_type, pk=int(slug)
+        )
+        return instance
 
     def create(self, request):
         """Create a Resource."""
@@ -197,13 +225,7 @@ class ResourceViewSet(viewsets.ModelViewSet):
 
     def retrieve(self, request, slug: str):
         """Return the resource for the given resource type name."""
-        resource_type = get_object_or_404(
-            ResourceType, slug=self.resource_type_name
-        )
-        instance = get_object_or_404(
-            Resource, resource_type=resource_type, pk=int(slug)
-        )
-
+        instance = self.get_instance(request, slug)
         serializer = self.get_serializer(instance=instance, many=False)
         return Response(serializer.data)
 

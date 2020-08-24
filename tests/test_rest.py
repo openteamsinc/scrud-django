@@ -1,10 +1,12 @@
 import json
 from copy import copy
+from datetime import timezone
 
 import pytest
 from django.urls import reverse
+from django.utils.http import http_date, quote_etag
 from rest_framework import status
-from safetydance_django.test import Http, http  # noqa: F401
+from safetydance_django.test import Http, http, http_response  # noqa: F401
 from safetydance_test import And, Given, Then, scripted_test
 
 from scrud_django.registration import (
@@ -37,8 +39,12 @@ def serialize_page(resources):
 def serialize_resource_envelope(resource):
     return {
         'content': resource.content,
-        'last_modified': resource.modified_at.isoformat(),
-        'etag': resource.etag,
+        'last_modified': http_date(
+            resource.modified_at.replace(tzinfo=timezone.utc).timestamp()
+        ),
+        'etag': quote_etag(resource.etag),
+        'href': "http://testserver"
+        + reverse(RESOURCE_ENDPOINT_DETAIL_NAME, args=[resource.id]),
     }
 
 
@@ -142,10 +148,14 @@ def test_resource_put(admin_login, partner_profile_post_data):
     assert url == f'/partner-profiles/{resource.id}/'
 
     Given.http.force_authenticate(admin_login)
+    And.http.get(url)
+    response = http_response
     And.http.put(
         url,
         data=json.dumps(partner_profile_put_data),
         content_type='application/json',
+        HTTP_IF_UNMODIFIED_SINCE=response["Last-Modified"],
+        HTTP_IF_MATCH=response["ETag"],
     )
     Then.http.status_code_is(status.HTTP_200_OK)
     And.http.content_type_is('application/json')
@@ -167,8 +177,12 @@ def test_resource_delete(admin_login, partner_profile_post_data):
     assert url == f'/partner-profiles/{resource.id}/'
 
     Given.http.force_authenticate(admin_login)
+    And.http.get(url)
+    response = http_response
     And.http.delete(
-        url, content_type='application/json',
+        url,
+        HTTP_IF_UNMODIFIED_SINCE=response["Last-Modified"],
+        HTTP_IF_MATCH=response["ETag"],
     )
     Then.http.status_code_is(status.HTTP_204_NO_CONTENT)
 
