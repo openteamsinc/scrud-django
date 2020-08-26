@@ -1,5 +1,7 @@
 import os
 
+from django.db.utils import OperationalError
+
 from scrud_django.registration import ResourceTypeRegistration
 
 registration_file = os.path.join(
@@ -8,5 +10,13 @@ registration_file = os.path.join(
 
 urlpatterns = []
 
-registration = ResourceTypeRegistration(registration_file)
-urlpatterns.extend(registration.urls)
+try:
+    registration = ResourceTypeRegistration(registration_file)
+    urlpatterns.extend(registration.urls)
+except OperationalError:
+    import logging
+
+    logging.warn(
+        "Failed to register resource types! If you're running migrations "
+        "this is OK and expected."
+    )

@@ -9,6 +9,7 @@ from rest_framework import status, viewsets
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.reverse import reverse_lazy
+from rest_framework.views import APIView
 
 from scrud_django import serializers
 from scrud_django.models import Resource, ResourceType
@@ -26,6 +27,42 @@ def get_string_or_evaluate(string_or_func, view_set, request, *args, **kwargs):
     if isinstance(string_or_func, str):
         return string_or_func
     return string_or_func(view_set, request, *args, **kwargs)
+
+
+def get_schema_uri_for(resource_type, request):
+    uri = None
+    # prefer a local version to a remote version
+    if resource_type.schema:
+        schema = resource_type.schema
+        uri = reverse_lazy(
+            schema.resource_type.route_name_detail(),
+            args=[schema.id],
+            request=request,
+        )
+    elif resource_type.schema_uri:
+        uri = resource_type.schema_uri
+    if uri:
+        return link_content(uri, "describedBy", "application/json")
+    return None
+
+
+def get_context_uri_for(resource_type, request):
+    uri = None
+    # prefer a local version to a remote version
+    if resource_type.context:
+        context = resource_type.context
+        uri = reverse_lazy(
+            context.resource_type.route_name_detail(),
+            args=[context.id],
+            request=request,
+        )
+    elif resource_type.context_uri:
+        uri = resource_type.context_uri
+    if uri:
+        return link_content(
+            uri, "http://www.w3.org/ns/json-ld#context", "application/ld+json",
+        )
+    return None
 
 
 def scrudful(
@@ -71,8 +108,6 @@ def scrudful(
                 return None
 
             if request.method not in ("POST", "OPTIONS"):
-                print(args)
-                print(kwargs)
                 etag = (
                     etag_func(self, request, *args, **kwargs)
                     if etag_func
@@ -173,17 +208,7 @@ class ResourceViewSet(viewsets.ModelViewSet):
                 resource_type = get_object_or_404(
                     ResourceType, slug=view_instance.resource_type_name
                 )
-                if resource_type.schema_uri:
-                    uri = resource_type.schema_uri
-                elif resource_type.schema:
-                    schema = resource_type.schema
-                    uri = reverse_lazy(
-                        schema.resource_type.route_name_detail(),
-                        args=[schema.id],
-                        request=request,
-                    )
-                if uri:
-                    return link_content(uri, "describedBy", "application/json")
+                return get_schema_uri_for(resource_type, request)
             return None
 
         def context_link_or_func(view_instance, request, slug: str = None):
@@ -191,21 +216,7 @@ class ResourceViewSet(viewsets.ModelViewSet):
                 resource_type = get_object_or_404(
                     ResourceType, slug=view_instance.resource_type_name
                 )
-                if resource_type.context_uri:
-                    uri = resource_type.context_uri
-                elif resource_type.context:
-                    context = resource_type.context
-                    uri = reverse_lazy(
-                        context.resource_type.route_name_detail(),
-                        args=[context.id],
-                        request=request,
-                    )
-                if uri:
-                    return link_content(
-                        uri,
-                        "http://www.w3.org/ns/json-ld#context",
-                        "application/ld+json",
-                    )
+                return get_context_uri_for(resource_type, request)
 
         def list_etag_func(view_instance, request, *args, **kwargs):
             resource_type = get_object_or_404(
@@ -219,9 +230,33 @@ class ResourceViewSet(viewsets.ModelViewSet):
             )
             return resource_type.modified_at
 
-        # list_last_modified_func =
-        list_schema_link_or_func = "list-schema-tbd"
-        list_context_link_or_func = "list-context-tbd"
+        def list_schema_link_or_func(view_instance, request, *args, **kwargs):
+            resource_type = get_object_or_404(
+                ResourceType, slug=view_instance.resource_type_name
+            )
+            return link_content(
+                reverse_lazy(
+                    "collections-json-schema",
+                    args=[resource_type.slug],
+                    request=request,
+                ),
+                "describedBy",
+                "application/json",
+            )
+
+        def list_context_link_or_func(view_instance, request, *args, **kwargs):
+            resource_type = get_object_or_404(
+                ResourceType, slug=view_instance.resource_type_name
+            )
+            return link_content(
+                reverse_lazy(
+                    "collections-json-ld",
+                    args=[resource_type.slug],
+                    request=request,
+                ),
+                "http://www.w3.org/ns/json-ld#context",
+                "application/ld+json",
+            )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -366,3 +401,102 @@ class JSONLDViewSet(viewsets.ViewSet):
         instance = Resource.objects.filter()
         serializer = self.serializer_class(instance=instance, many=True)
         return Response(serializer.data)
+
+
+class ResourceCollectionSchemaView(APIView):
+    def get(self, request, slug: str):
+        resource_type = get_object_or_404(ResourceType, slug=slug,)
+
+        if resource_type.schema:
+            content_defn = resource_type.schema.content
+        elif resource_type.schema_uri:
+            content_defn = {"$ref": resource_type.schema_uri}
+        else:
+            content_defn = {"type": "any"}
+
+        schema = {
+            "$id": "https://api.openteams.com/json-schema/ResourceCollection"
+            f"?contents_type={resource_type.type_uri}",
+            "$schema": "http://json-schema.org/draft-04/schema",
+            "description": f"A listing of resources of type {resource_type.type_uri}.",
+            "properties": {
+                "count": {
+                    "type": "integer",
+                    "description": "The total number of items in the collection.",
+                },
+                "page_count": {
+                    "type": "integer",
+                    "description": "The total number of pages in the collection.",
+                },
+                "first": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "URL of the first page.",
+                },
+                "previous": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "URL of the previous page, if any.",
+                },
+                "next": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "URL of the next page, if any.",
+                },
+                "last": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "URL of the last page.",
+                },
+                "content": {
+                    "properties": {
+                        "type": "array",
+                        "description": f"Listing of {resource_type.type_uri} "
+                        "resources in Envelopes.",
+                        "items": {
+                            "properties": {
+                                "href": {
+                                    "type": "string",
+                                    "format": "uri",
+                                    "description": "URL of the nested resource.",
+                                },
+                                "etag": {
+                                    "type": "string",
+                                    "description": "HTTP ETag header of the nested "
+                                    "resource.",
+                                },
+                                "last_modified": {
+                                    "type": "string",
+                                    "description": "HTTP Last-Modified header of the "
+                                    "nested resource.",
+                                },
+                                "content": content_defn,
+                            },
+                        },
+                    },
+                },
+            },
+        }
+
+        return Response(schema)
+
+
+class ResourceCollectionContextView(APIView):
+    def get(self, request, slug: str):
+        resource_type = get_object_or_404(ResourceType, slug=slug,)
+        return Response(
+            {
+                "openteams": "https://api.openteams.com/json-ld/",
+                "count": {"@id": "openteams:count"},
+                "page_count": {"@id": "openteams:page_count"},
+                "first": {"@id": "opententeams:first"},
+                "previous": {"@id": "opententeams:previous"},
+                "next": {"@id": "opententeams:next"},
+                "last": {"@id": "opententeams:last"},
+                "content": {
+                    "@id": "openteams:Envelope",
+                    "@container": "@list",
+                    "openteams:envelopeContents": resource_type.type_uri,
+                },
+            }
+        )

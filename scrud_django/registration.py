@@ -5,7 +5,7 @@ from uuid import uuid4
 import yaml
 from django.db import transaction
 from django.shortcuts import get_object_or_404
-from django.urls import path
+from django.urls import include, path
 
 from scrud_django.models import Resource, ResourceType
 
@@ -86,6 +86,7 @@ class ResourceTypeRegistration:
         json_ld_detail = views.JSONLDViewSet.as_view({'get': 'retrieve'})
 
         urls = [
+            path("", include("scrud_django.urls")),
             path('json-schema/', json_schema_list, name='json-schema-list'),
             path(
                 'json-schema/<str:slug>/',
