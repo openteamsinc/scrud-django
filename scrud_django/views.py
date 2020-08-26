@@ -8,6 +8,7 @@ from django.utils.http import http_date, quote_etag
 from rest_framework import status, viewsets
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.reverse import reverse_lazy
 
 from scrud_django import serializers
 from scrud_django.models import Resource, ResourceType
@@ -19,12 +20,12 @@ def link_content(url, rel, content_type):
     return f"<{url}>; rel=\"{rel}\"; type=\"{content_type}\""
 
 
-def get_string_or_evaluate(string_or_func, request, *args, **kwargs):
+def get_string_or_evaluate(string_or_func, view_set, request, *args, **kwargs):
     if not string_or_func:
         return None
     if isinstance(string_or_func, str):
         return string_or_func
-    return string_or_func(request, *args, **kwargs)
+    return string_or_func(view_set, request, *args, **kwargs)
 
 
 def scrudful(
@@ -70,6 +71,8 @@ def scrudful(
                 return None
 
             if request.method not in ("POST", "OPTIONS"):
+                print(args)
+                print(kwargs)
                 etag = (
                     etag_func(self, request, *args, **kwargs)
                     if etag_func
@@ -79,7 +82,7 @@ def scrudful(
                 last_modified = get_last_modified()
             else:
                 etag = None
-                last_modified = "Come on!"
+                last_modified = None
             response = get_conditional_response(
                 request, etag=etag, last_modified=last_modified
             )
@@ -87,13 +90,13 @@ def scrudful(
                 response = view_method(self, request, *args, **kwargs)
                 schema_link = (
                     get_string_or_evaluate(
-                        schema_link_or_func, request, *args, **kwargs
+                        schema_link_or_func, self, request, *args, **kwargs
                     )
                     or ""
                 )
                 context_link = (
                     get_string_or_evaluate(
-                        context_link_or_func, request, *args, **kwargs
+                        context_link_or_func, self, request, *args, **kwargs
                     )
                     or ""
                 )
@@ -165,8 +168,44 @@ class ResourceViewSet(viewsets.ModelViewSet):
             instance = view_instance.get_instance(request, slug)
             return instance.modified_at
 
-        schema_link_or_func = "schema-tbd"
-        context_link_or_func = "context-tbd"
+        def schema_link_or_func(view_instance, request, slug: str = None):
+            if view_instance.resource_type_name:
+                resource_type = get_object_or_404(
+                    ResourceType, slug=view_instance.resource_type_name
+                )
+                if resource_type.schema_uri:
+                    uri = resource_type.schema_uri
+                elif resource_type.schema:
+                    schema = resource_type.schema
+                    uri = reverse_lazy(
+                        schema.resource_type.route_name_detail(),
+                        args=[schema.id],
+                        request=request,
+                    )
+                if uri:
+                    return link_content(uri, "describedBy", "application/json")
+            return None
+
+        def context_link_or_func(view_instance, request, slug: str = None):
+            if view_instance.resource_type_name:
+                resource_type = get_object_or_404(
+                    ResourceType, slug=view_instance.resource_type_name
+                )
+                if resource_type.context_uri:
+                    uri = resource_type.context_uri
+                elif resource_type.context:
+                    context = resource_type.context
+                    uri = reverse_lazy(
+                        context.resource_type.route_name_detail(),
+                        args=[context.id],
+                        request=request,
+                    )
+                if uri:
+                    return link_content(
+                        uri,
+                        "http://www.w3.org/ns/json-ld#context",
+                        "application/ld+json",
+                    )
 
         def list_etag_func(request, *args, **kwargs):
             return "YYYY"
