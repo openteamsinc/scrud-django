@@ -12,6 +12,9 @@ https://docs.djangoproject.com/en/3.1/ref/settings/
 
 from pathlib import Path
 
+from corsheaders.defaults import default_headers
+from decouple import Csv, config
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve(strict=True).parent.parent
 
@@ -40,6 +43,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'corsheaders',
     'scrud_django',
 ]
 
@@ -122,3 +126,15 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.1/howto/static-files/
 
 STATIC_URL = '/static/'
+
+# CORS
+
+CORS_ORIGIN_WHITELIST = config(
+    "CORS_ORIGIN_WHITELIST",
+    cast=Csv(),
+    default="http://127.0.0.1:8000, http://localhost:8000, http://0.0.0.0:8000",
+)
+CORS_ALLOW_HEADERS = [
+    *default_headers,
+    "x-timezone",
+]
