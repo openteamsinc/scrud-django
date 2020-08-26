@@ -207,8 +207,17 @@ class ResourceViewSet(viewsets.ModelViewSet):
                         "application/ld+json",
                     )
 
-        def list_etag_func(request, *args, **kwargs):
-            return "YYYY"
+        def list_etag_func(view_instance, request, *args, **kwargs):
+            resource_type = get_object_or_404(
+                ResourceType, slug=view_instance.resource_type_name
+            )
+            return resource_type.etag
+
+        def list_last_modified_func(view_instance, request, *args, **kwargs):
+            resource_type = get_object_or_404(
+                ResourceType, slug=view_instance.resource_type_name
+            )
+            return resource_type.modified_at
 
         # list_last_modified_func =
         list_schema_link_or_func = "list-schema-tbd"

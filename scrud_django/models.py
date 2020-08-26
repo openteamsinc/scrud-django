@@ -35,6 +35,8 @@ class ResourceType(models.Model):
         related_name='resource_type_context',
     )
     context_uri = models.URLField(null=True)
+    modified_at = models.DateTimeField()
+    etag = models.CharField(max_length=40)
 
     def route_name_list(self):
         return f"{self.slug}-list"

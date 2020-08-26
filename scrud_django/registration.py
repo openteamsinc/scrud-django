@@ -3,6 +3,7 @@ from typing import Dict, List
 from uuid import uuid4
 
 import yaml
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.urls import path
 
@@ -61,6 +62,8 @@ class ResourceTypeRegistration:
             return
 
         rt = ResourceType(**data)
+        rt.etag = uuid4().hex
+        rt.modified_at = datetime.now()
         rt.save()
         self.resource_type_list.append(rt)
 
@@ -146,15 +149,19 @@ class ResourceRegistration:
         Resource
 
         """
-        resource_type = get_object_or_404(ResourceType, slug=register_type)
+        with transaction.atomic():
+            resource_type = get_object_or_404(ResourceType, slug=register_type)
 
-        resource = Resource(
-            content=content,
-            resource_type=resource_type,
-            etag=uuid4().hex,
-            modified_at=datetime.now(),
-        )
-        resource.save()
+            resource = Resource(
+                content=content,
+                resource_type=resource_type,
+                etag=uuid4().hex,
+                modified_at=datetime.now(),
+            )
+            resource_type.etag = resource.etag
+            resource_type.modified_at = resource.modified_at
+            resource.save()
+            resource_type.save()
         return resource
 
     @staticmethod
@@ -173,18 +180,21 @@ class ResourceRegistration:
         Resource
 
         """
-        resource_type = get_object_or_404(ResourceType, slug=register_type)
+        with transaction.atomic():
+            resource_type = get_object_or_404(ResourceType, slug=register_type)
 
-        # note: for now slug is used as ID
-        resource = get_object_or_404(
-            Resource, resource_type=resource_type, pk=int(slug)
-        )
+            # note: for now slug is used as ID
+            resource = get_object_or_404(
+                Resource, resource_type=resource_type, pk=int(slug)
+            )
 
-        resource.content = content
-        resource.etag = uuid4().hex
-        resource.modified_at = datetime.now()
-
-        resource.save()
+            resource.content = content
+            resource.etag = uuid4().hex
+            resource.modified_at = datetime.now()
+            resource_type.etag = resource.etag
+            resource_type.modified_at = resource.modified_at
+            resource.save()
+            resource_type.save()
         return resource
 
     @staticmethod
@@ -198,10 +208,14 @@ class ResourceRegistration:
         slug : str
 
         """
-        resource_type = get_object_or_404(ResourceType, slug=register_type)
+        with transaction.atomic():
+            resource_type = get_object_or_404(ResourceType, slug=register_type)
 
-        # note: for now slug is used as ID
-        resource = get_object_or_404(
-            Resource, resource_type=resource_type, pk=int(slug)
-        )
-        resource.delete()
+            # note: for now slug is used as ID
+            resource = get_object_or_404(
+                Resource, resource_type=resource_type, pk=int(slug)
+            )
+            resource.delete()
+            resource_type.etag = uuid4().hex
+            resource_type.modified_at = datetime.now()
+            resource_type.save()

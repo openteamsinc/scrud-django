@@ -41,6 +41,9 @@ class ResourceTypeFactory(factory.django.DjangoModelFactory):
     context = factory.LazyFunction(fake_resource)
     context_uri = None
 
+    modified_at = factory.LazyFunction(datetime.now)
+    etag = factory.LazyFunction(lambda: uuid4().hex)
+
 
 class ResourceFactory(factory.django.DjangoModelFactory):
     class Meta:
