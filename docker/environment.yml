@@ -9,5 +9,5 @@ dependencies:
   - psycopg2
   - python-decouple
   - python-dotenv
-  -pip:
+  - pip:
     - django-jsonfield
