@@ -12,7 +12,6 @@ from scrud_django.decorators import scrudful_viewset
 from scrud_django.models import Resource, ResourceType
 from scrud_django.paginations import StandardResultsSetPagination
 from scrud_django.registration import ResourceRegistration
-from scrud_django.utils import link_content
 
 
 def get_schema_uri_for(resource_type, request):
@@ -27,9 +26,7 @@ def get_schema_uri_for(resource_type, request):
         )
     elif resource_type.schema_uri:
         uri = resource_type.schema_uri
-    if uri:
-        return link_content(uri, "describedBy", "application/json")
-    return None
+    return uri
 
 
 def get_context_uri_for(resource_type, request):
@@ -44,11 +41,7 @@ def get_context_uri_for(resource_type, request):
         )
     elif resource_type.context_uri:
         uri = resource_type.context_uri
-    if uri:
-        return link_content(
-            uri, "http://www.w3.org/ns/json-ld#context", "application/ld+json",
-        )
-    return None
+    return uri
 
 
 # RESOURCE
@@ -103,28 +96,20 @@ class ResourceViewSet(viewsets.ModelViewSet):
             resource_type = get_object_or_404(
                 ResourceType, slug=view_instance.resource_type_name
             )
-            return link_content(
-                reverse_lazy(
-                    "collections-json-schema",
-                    args=[resource_type.slug],
-                    request=request,
-                ),
-                "describedBy",
-                "application/json",
+            return reverse_lazy(
+                "collections-json-schema",
+                args=[resource_type.slug],
+                request=request,
             )
 
         def list_context_link_or_func(view_instance, request, *args, **kwargs):
             resource_type = get_object_or_404(
                 ResourceType, slug=view_instance.resource_type_name
             )
-            return link_content(
-                reverse_lazy(
-                    "collections-json-ld",
-                    args=[resource_type.slug],
-                    request=request,
-                ),
-                "http://www.w3.org/ns/json-ld#context",
-                "application/ld+json",
+            return reverse_lazy(
+                "collections-json-ld",
+                args=[resource_type.slug],
+                request=request,
             )
 
     def __init__(self, *args, **kwargs):

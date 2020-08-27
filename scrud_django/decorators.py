@@ -1,110 +1,393 @@
 from datetime import timezone
-from functools import wraps
+from functools import partial, update_wrapper
 
 from django.utils.cache import get_conditional_response
 from django.utils.http import http_date, quote_etag
+from rest_framework import status
+from rest_framework.metadata import BaseMetadata
 from rest_framework.response import Response
 
-from scrud_django.utils import get_string_or_evaluate
+from scrud_django.utils import get_string_or_evaluate, link_content
+
+
+class ScrudfulViewFunc:
+    def __init__(
+        self,
+        view_method,
+        etag_func=None,
+        last_modified_func=None,
+        schema_link_or_func=None,
+        schema_rel_or_func=None,
+        schema_type_or_func=None,
+        context_link_or_func=None,
+        context_rel_or_func=None,
+        context_type_or_func=None,
+        http_schema_or_func=None,
+    ):
+        self.view_method = view_method
+        self.etag_func = etag_func
+        self.last_modified_func = last_modified_func
+        self.schema_link_or_func = schema_link_or_func
+        self.schema_rel_or_func = schema_rel_or_func
+        self.schema_type_or_func = schema_type_or_func
+        self.context_link_or_func = context_link_or_func
+        self.context_rel_or_func = context_rel_or_func
+        self.context_type_or_func = context_type_or_func
+        self.http_schema_or_func = http_schema_or_func
+        update_wrapper(self, self.view_method)
+
+    def __get__(self, obj, objtype):
+        return partial(self.__call__, obj)
+
+    def __call__(self, view_instance, request, *args, **kwargs):
+        if request.method in ("PUT", "DELETE"):
+            missing_required_headers = []
+            if self.etag_func and not request.META.get("HTTP_IF_MATCH"):
+                missing_required_headers.append("If-Match")
+            if self.last_modified_func and not request.META.get(
+                "HTTP_IF_UNMODIFIED_SINCE"
+            ):
+                missing_required_headers.append("If-Unmodified-Since")
+            if missing_required_headers:
+                # TODO Define standard error json
+                response = Response(
+                    {"missing-required-headers": missing_required_headers},
+                    status=400,
+                )
+                return response
+
+        # Compute values (if any) for the requested resource.
+        def get_last_modified():
+            if self.last_modified_func:
+                last_modified = self.last_modified_func(
+                    view_instance, request, *args, **kwargs
+                )
+                if last_modified:
+                    return http_date(
+                        last_modified.replace(tzinfo=timezone.utc).timestamp()
+                    )
+            return None
+
+        etag = None
+        last_modified = None
+        if request.method not in ("POST", "OPTIONS"):
+            if self.etag_func:
+                etag = self.etag_func(view_instance, request, *args, **kwargs)
+            etag = quote_etag(etag) if etag else None
+            last_modified = get_last_modified()
+        else:
+            etag = None
+            last_modified = None
+        response = get_conditional_response(
+            request, etag=etag, last_modified=last_modified
+        )
+        if response is None:
+            response = self.view_method(
+                view_instance, request, *args, **kwargs
+            )
+            schema_link = (
+                self.schema_link_header(
+                    view_instance, request, *args, **kwargs
+                )
+                or ""
+            )
+            context_link = (
+                self.context_link_header(
+                    view_instance, request, *args, **kwargs
+                )
+                or ""
+            )
+            join_links = ", " if schema_link and context_link else ""
+            link_content = schema_link + join_links + context_link
+            if etag:
+                response["ETag"] = etag
+            if last_modified:
+                response["Last-Modified"] = last_modified
+            if link_content:
+                response["Link"] = link_content
+        return response
+
+    def schema_link(self, view_instance, request, *args, **kwargs):
+        return get_string_or_evaluate(
+            self.schema_link_or_func, view_instance, request, *args, **kwargs
+        )
+
+    def schema_link_header(self, view_instance, request, *args, **kwargs):
+        link = self.schema_link(view_instance, request, *args, **kwargs)
+        if link:
+            link_rel = (
+                get_string_or_evaluate(
+                    self.schema_rel_or_func,
+                    view_instance,
+                    request,
+                    *args,
+                    **kwargs,
+                )
+                or "describedBy"
+            )
+            link_type = (
+                get_string_or_evaluate(
+                    self.schema_type_or_func,
+                    view_instance,
+                    request,
+                    *args,
+                    **kwargs,
+                )
+                or "application/json"
+            )
+            return link_content(link, link_rel, link_type)
+        return None
+
+    def context_link(self, view_instance, request, *args, **kwargs):
+        return get_string_or_evaluate(
+            self.context_link_or_func, view_instance, request, *args, **kwargs
+        )
+
+    def context_link_header(self, view_instance, request, *args, **kwargs):
+        link = self.context_link(view_instance, request, *args, **kwargs)
+        if link:
+            link_rel = (
+                get_string_or_evaluate(
+                    self.context_rel_or_func,
+                    view_instance,
+                    request,
+                    *args,
+                    **kwargs,
+                )
+                or "http://www.w3.org/ns/json-ld#context"
+            )
+            link_type = (
+                get_string_or_evaluate(
+                    self.context_type_or_func,
+                    view_instance,
+                    request,
+                    *args,
+                    **kwargs,
+                )
+                or "application/ld+json"
+            )
+            return link_content(link, link_rel, link_type)
+        return None
 
 
 def scrudful(
     etag_func=None,
     last_modified_func=None,
     schema_link_or_func=None,
+    schema_rel_or_func=None,
+    schema_type_or_func=None,
     context_link_or_func=None,
+    context_rel_or_func=None,
+    context_type_or_func=None,
     http_schema_or_func=None,
 ):
     """Decorator to make a view method SCRUDful"""
     # TODO what about 400 Bad Request context and schema?
     def decorator(view_method):
-        @wraps(view_method)
-        def inner(self, request, *args, **kwargs):
-            if request.method in ("PUT", "DELETE"):
-                missing_required_headers = []
-                if etag_func and not request.META.get("HTTP_IF_MATCH"):
-                    missing_required_headers.append("If-Match")
-                if last_modified_func and not request.META.get(
-                    "HTTP_IF_UNMODIFIED_SINCE"
-                ):
-                    missing_required_headers.append("If-Unmodified-Since")
-                if missing_required_headers:
-                    # TODO Define standard error json
-                    response = Response(
-                        {"missing-required-headers": missing_required_headers},
-                        status=400,
-                    )
-                    return response
-
-            # Compute values (if any) for the requested resource.
-            def get_last_modified():
-                if last_modified_func:
-                    last_modified = last_modified_func(
-                        self, request, *args, **kwargs
-                    )
-                    if last_modified:
-                        return http_date(
-                            last_modified.replace(
-                                tzinfo=timezone.utc
-                            ).timestamp()
-                        )
-                return None
-
-            if request.method not in ("POST", "OPTIONS"):
-                etag = (
-                    etag_func(self, request, *args, **kwargs)
-                    if etag_func
-                    else None
-                )
-                etag = quote_etag(etag) if etag else None
-                last_modified = get_last_modified()
-            else:
-                etag = None
-                last_modified = None
-            response = get_conditional_response(
-                request, etag=etag, last_modified=last_modified
-            )
-            if response is None:
-                response = view_method(self, request, *args, **kwargs)
-                schema_link = (
-                    get_string_or_evaluate(
-                        schema_link_or_func, self, request, *args, **kwargs
-                    )
-                    or ""
-                )
-                context_link = (
-                    get_string_or_evaluate(
-                        context_link_or_func, self, request, *args, **kwargs
-                    )
-                    or ""
-                )
-                join_links = ", " if schema_link and context_link else ""
-                link_content = schema_link + join_links + context_link
-                if etag:
-                    response["ETag"] = etag
-                if last_modified:
-                    response["Last-Modified"] = last_modified
-                if link_content:
-                    response["Link"] = link_content
-            return response
-
-        setattr(inner, "http_schema_or_func", http_schema_or_func)
-        return inner
+        return ScrudfulViewFunc(
+            view_method,
+            etag_func=etag_func,
+            last_modified_func=last_modified_func,
+            schema_link_or_func=schema_link_or_func,
+            schema_rel_or_func=schema_rel_or_func,
+            schema_type_or_func=schema_type_or_func,
+            context_link_or_func=context_link_or_func,
+            context_rel_or_func=schema_rel_or_func,
+            context_type_or_func=schema_type_or_func,
+            http_schema_or_func=http_schema_or_func,
+        )
 
     return decorator
 
 
+class ScrudfulMetadata(BaseMetadata):
+    def determine_metadata(self, request, view, *args, **kwargs):
+        if len(args) > 0 or len(kwargs) > 0:  # this is a detail request
+            return self.determine_metadata_for_detail(request, view)
+        return self.determine_metadata_for_list(request, view)
+
+    def determine_metadata_for_detail(self, request, view):
+        metadata = dict()
+        metadata.update(
+            {
+                key: value
+                for key, value in {
+                    "get": self.determine_metadata_for_get(
+                        request, view, "retrieve"
+                    ),
+                    "put": self.determine_metadata_for_put(request, view),
+                    "delete": self.determine_metadata_for_delete(
+                        request, view
+                    ),
+                }.items()
+                if value is not None
+            }
+        )
+        return metadata
+
+    def determine_metadata_for_list(self, request, view):
+        metadata = dict()
+        metadata.update(
+            {
+                key: value
+                for key, value in {
+                    "post": self.determine_metadata_for_post(request, view),
+                    "get": self.determine_metadata_for_get(
+                        request, view, "list"
+                    ),
+                }.items()
+                if value is not None
+            }
+        )
+        return metadata
+
+    def get_method(self, view, name):
+        method_partial = getattr(view, name, None)
+        if method_partial:
+            return method_partial.func.__self__
+        return None
+
+    def determine_metadata_for_post(self, request, view):
+        create_method = self.get_method(view, "create")
+        if create_method is None:
+            return None
+        schema_link = create_method.schema_link(view, request)
+        context_link = create_method.context_link(view, request)
+        request_body = {
+            "description": "The content for the resource to be created.",
+            "required": True,
+        }
+        if schema_link or context_link:
+            json_content = {}
+            if schema_link:
+                json_content["schema"] = schema_link
+            if context_link:
+                json_content["context"] = context_link
+            request_body["content"] = {
+                "application/json": json_content,
+            }
+        metadata = {
+            "requestBody": request_body,
+            "responses": {"201": {"description": "CREATED"}},
+        }
+        return metadata
+
+    def determine_metadata_for_get(self, request, view, name):
+        list_method = self.get_method(view, name)
+        schema_link = list_method.schema_link(view, request)
+        context_link = list_method.context_link(view, request)
+        json_content = None
+        if schema_link or context_link:
+            json_content = {}
+            if schema_link:
+                json_content["schema"] = schema_link
+            if context_link:
+                json_content["context"] = context_link
+        responses = {
+            "200": {"description": "OK"},
+        }
+        if json_content:
+            responses["200"]["content"] = {
+                "application/json": json_content,
+            }
+        return {
+            "responses": responses,
+        }
+
+    def required_conditional_headers(self, method):
+        supports_etag = method.etag_func is not None
+        supports_last_modified = method.last_modified_func is not None
+        parameters = None
+        if supports_etag or supports_last_modified:
+            parameters = []
+            if supports_etag:
+                parameters.append(
+                    {
+                        "in": "header",
+                        "name": "If-Match",
+                        "schema": {"type": "string"},
+                        "required": True,
+                    }
+                )
+            if supports_last_modified:
+                parameters.append(
+                    {
+                        "in": "header",
+                        "name": "If-Unmodified-Since",
+                        "schema": {"type": "string"},
+                        "required": True,
+                    }
+                )
+        return parameters
+
+    def determine_metadata_for_put(self, request, view):
+        update_method = self.get_method(view, "update")
+        if update_method is None:
+            return
+        schema_link = update_method.schema_link(view, request)
+        context_link = update_method.context_link(view, request)
+        request_body = {
+            "description": "The content for the resource to be created.",
+            "required": True,
+        }
+        if schema_link or context_link:
+            json_content = {}
+            if schema_link:
+                json_content["schema"] = schema_link
+            if context_link:
+                json_content["context"] = context_link
+            request_body["content"] = {
+                "application/json": json_content,
+            }
+        metadata = {
+            "requestBody": request_body,
+            "responses": {"200": {"description": "OK"}},
+        }
+        parameters = self.required_conditional_headers(update_method)
+        if parameters:
+            metadata["parameters"] = parameters
+        return metadata
+
+    def determine_metadata_for_delete(self, request, view):
+        delete_method = self.get_method(view, "destroy")
+        if delete_method is None:
+            return None
+        metadata = {
+            "responses": {"200": {"description": "OK"}},
+        }
+        parameters = self.required_conditional_headers(delete_method)
+        if parameters:
+            metadata["parameters"] = parameters
+        return metadata
+
+
+def options(view_instance, request, *args, **kwargs):
+    data = ScrudfulMetadata().determine_metadata(
+        request, view_instance, *args, **kwargs
+    )
+    return Response(data, status=status.HTTP_200_OK)
+
+
 def scrudful_viewset(cls):
+    setattr(cls, "options", options)
     meta = getattr(cls, "Meta", None)
     etag_func = getattr(meta, "etag_func", None)
     last_modified_func = getattr(meta, "last_modified_func", None)
     schema_link_or_func = getattr(meta, "schema_link_or_func", None)
+    schema_rel_or_func = getattr(meta, "schema_rel_or_func", None)
+    schema_type_or_func = getattr(meta, "schema_type_or_func", None)
     context_link_or_func = getattr(meta, "context_link_or_func", None)
+    context_rel_or_func = getattr(meta, "context_rel_or_func", None)
+    context_type_or_func = getattr(meta, "context_type_or_func", None)
     scrudful_item = scrudful(
         etag_func=etag_func,
         last_modified_func=last_modified_func,
         schema_link_or_func=schema_link_or_func,
+        schema_rel_or_func=schema_rel_or_func,
+        schema_type_or_func=schema_type_or_func,
         context_link_or_func=context_link_or_func,
+        context_rel_or_func=context_rel_or_func,
+        context_type_or_func=context_type_or_func,
     )
     for method_name in ("create", "retrieve", "update", "destroy"):
         method = getattr(cls, method_name)
@@ -116,8 +399,18 @@ def scrudful_viewset(cls):
             schema_link_or_func=getattr(
                 meta, "list_schema_link_or_func", None
             ),
+            schema_rel_or_func=getattr(meta, "list_schema_rel_or_func", None),
+            schema_type_or_func=getattr(
+                meta, "list_schema_type_or_func", None
+            ),
             context_link_or_func=getattr(
                 meta, "list_context_link_or_func", None
+            ),
+            context_rel_or_func=getattr(
+                meta, "list_context_rel_or_func", None
+            ),
+            context_type_or_func=getattr(
+                meta, "list_context_type_or_func", None
             ),
         )
         list_method = getattr(cls, "list")
