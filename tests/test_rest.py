@@ -177,24 +177,6 @@ JSON_SCHEMA_ENDPOINT_DETAIL_NAME = f"{JSON_SCHEMA_ENDPOINT_PREFIX}-detail"
 JSON_SCHEMA_ENDPOINT_LIST_NAME = f"{JSON_SCHEMA_ENDPOINT_PREFIX}-list"
 
 
-@pytest.mark.skip()
-@pytest.mark.django_db
-@scripted_test
-def test_js_schema_get_detail(regular_login):
-    # NOTE: run url reverse first for resource type registrations
-    resource_type_name = 'partner-profiles'
-    url = reverse(
-        JSON_SCHEMA_ENDPOINT_DETAIL_NAME, kwargs={'slug': resource_type_name},
-    )
-    assert url == f'/json-schema/{resource_type_name}/'
-
-    Given.http.force_authenticate(regular_login)
-    And.http.get(url)
-    Then.http.status_code_is(status.HTTP_200_OK)
-    And.http.content_type_is('application/json')
-    And.http.response_json_is({})
-
-
 @pytest.mark.django_db
 @scripted_test
 def test_js_schema_get_list(regular_login):
@@ -214,23 +196,6 @@ def test_js_schema_get_list(regular_login):
 JSON_LD_ENDPOINT_PREFIX = "json-ld"
 JSON_LD_ENDPOINT_DETAIL_NAME = f"{JSON_LD_ENDPOINT_PREFIX}-detail"
 JSON_LD_ENDPOINT_LIST_NAME = f"{JSON_LD_ENDPOINT_PREFIX}-list"
-
-
-@pytest.mark.skip()
-@pytest.mark.django_db
-@scripted_test
-def test_js_ld_get_detail(regular_login):
-    resource_type_name = 'partner-profiles'
-    url = reverse(
-        JSON_LD_ENDPOINT_DETAIL_NAME, kwargs={'slug': resource_type_name},
-    )
-    assert url == f'/json-ld/{resource_type_name}/'
-
-    Given.http.force_authenticate(regular_login)
-    And.http.get(url)
-    Then.http.status_code_is(status.HTTP_200_OK)
-    And.http.content_type_is('application/json')
-    And.http.response_json_is({})
 
 
 @pytest.mark.django_db
