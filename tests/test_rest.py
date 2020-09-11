@@ -91,7 +91,6 @@ def test_resource_get_detail(regular_login, partner_profile_post_data):
     And.http.response_json_is(serialize_resource(resource))
 
 
-@pytest.mark.skip()
 @pytest.mark.django_db
 @scripted_test
 def test_resource_post(admin_login, partner_profile_post_data):
@@ -112,7 +111,6 @@ def test_resource_post(admin_login, partner_profile_post_data):
     And.http.resource_json_is(serialized_data)
 
 
-@pytest.mark.skip()
 @pytest.mark.django_db
 @scripted_test
 def test_resource_put(admin_login, partner_profile_post_data):
@@ -148,7 +146,6 @@ def test_resource_put(admin_login, partner_profile_post_data):
     And.http.resource_json_is(serialized_data)
 
 
-@pytest.mark.skip()
 @pytest.mark.django_db
 @scripted_test
 def test_resource_delete(admin_login, partner_profile_post_data):
@@ -198,7 +195,6 @@ def test_js_schema_get_detail(regular_login):
     And.http.response_json_is({})
 
 
-@pytest.mark.skip()
 @pytest.mark.django_db
 @scripted_test
 def test_js_schema_get_list(regular_login):
@@ -237,7 +233,6 @@ def test_js_ld_get_detail(regular_login):
     And.http.response_json_is({})
 
 
-@pytest.mark.skip()
 @pytest.mark.django_db
 @scripted_test
 def test_js_ld_get_list(regular_login):
