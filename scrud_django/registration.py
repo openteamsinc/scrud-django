@@ -2,6 +2,7 @@ import logging
 from datetime import datetime
 from uuid import uuid4
 
+from django.conf import settings
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.urls import path
@@ -13,9 +14,12 @@ class ResourceTypeRegistration:
     def __init__(
         self,
         resource_type_uri: str,
+        revision: str,
         schema_resource: Resource = None,
+        schema_func: str = None,
         schema_uri: str = None,
         context_resource: Resource = None,
+        context_func: str = None,
         context_uri: str = None,
         slug: str = None,
     ):
@@ -28,16 +32,25 @@ class ResourceTypeRegistration:
         else:
             resource_type = ResourceType(
                 type_uri=resource_type_uri,
-                schema=schema_resource,
                 schema_uri=schema_uri,
-                context=context_resource,
                 context_uri=context_uri,
                 slug=slug,
-                etag=uuid4().hex,
                 modified_at=datetime.now(),
             )
-            resource_type.save()
             self.resource_type = resource_type
+
+        if self.resource_type.etag != revision or settings.DEBUG:
+            self.resource_type.etag = revision
+            if schema_resource is None and schema_func:
+                self.resource_type.schema = register_json_schema(
+                    schema_func, self.resource_type.schema
+                )
+            if context_resource is None and context_func:
+                self.resource_type.context = register_json_ld_context(
+                    context_func, self.resource_type.context
+                )
+            self.resource_type.save()
+            logging.warning(self.resource_type.slug)
         self.register_urls()
 
     def register_urls(self):
@@ -168,6 +181,7 @@ def register_json_schema_resource_type():
     if JSON_SCHEMA_RESOURCE_TYPE_ is None:
         JSON_SCHEMA_REGISTRATION_ = ResourceTypeRegistration(
             resource_type_uri="http://json-schema.org/draft-04/schema",
+            revision="1",
             schema_uri="http://json-schema.org/draft-04/schema",
             slug="json-schema",
         )
@@ -181,66 +195,66 @@ def register_json_ld_resource_type():
     if JSON_LD_RESOURCE_TYPE_ is None:
         JSON_LD_REGISTRATION_ = ResourceTypeRegistration(
             resource_type_uri="http://www.w3.org/ns/json-ld#context",
+            revision="1",
             slug="json-ld",
         )
         JSON_LD_RESOURCE_TYPE_ = JSON_LD_REGISTRATION_.resource_type
     return JSON_LD_RESOURCE_TYPE_
 
 
-def register_file(file_to_register, resource_type):
-    resource = None
-    try:
-        contents = file_to_register.read()
+def register_file(file_contents_func, previous_revision, resource_type):
+    contents = file_contents_func()
+    if previous_revision:
+        resource = ResourceRegistration.update(contents, resource_type.slug)
+    else:
         resource = ResourceRegistration.register(contents, resource_type.slug)
-    except Exception as e:
-        logging.error(e)
-    finally:
-        file_to_register.close()
     return resource
 
 
-def register_json_schema(schema_file):
+def register_json_schema(schema_func, previous_revision):
     resource_type = register_json_schema_resource_type()
-    return register_file(schema_file, resource_type)
+    return register_file(schema_func, previous_revision, resource_type)
 
 
-def register_json_ld_context(context_file):
+def register_json_ld_context(context_func, previous_revision):
     resource_type = register_json_ld_resource_type()
-    return register_file(context_file, resource_type)
+    return register_file(context_func, previous_revision, resource_type)
 
 
 def json_resource_type(
     resource_type_uri: str,
+    revision: str,
+    slug: str,
     schema_resource: Resource = None,
-    schema_file=None,
+    schema_func=None,
     schema_uri: str = None,
     context_resource: Resource = None,
-    context_file=None,
+    context_func=None,
     context_uri: str = None,
 ):
     """Registration of a single json resource type. Callers **should** provide one and
-    only one of `schema_resource, schema_file, schema_uri` as well as one and only  one
-    of `context_resource, context_file, context_uri`.
+    only one of `schema_resource, schema_path, schema_uri` as well as one and only  one
+    of `context_resource, context_path, context_uri`.
     """
-    if schema_resource is None and schema_file is not None:
-        schema_resource = register_json_schema(schema_file)
-    if context_resource is None and context_file is not None:
-        context_resource = register_json_ld_context(context_file)
     resource_type_registration = ResourceTypeRegistration(
         resource_type_uri,
+        revision,
+        slug=slug,
         schema_resource=schema_resource,
+        schema_func=schema_func,
         schema_uri=schema_uri,
         context_resource=context_resource,
+        context_func=context_func,
         context_uri=context_uri,
     )
     return resource_type_registration.urls
 
 
-def json_resource_types(configuration_dict):
-    """Registration of multiple resource types.
-    resource_type_uri -> configuration
+def resource_types(*args):
+    """Convenience function to make the configuration of resource type registrations
+    more readable.
     """
-    urls = []
-    for resource_type_uri, configuration in configuration_dict.items():
-        urls.extend(json_resource_type(resource_type_uri, **configuration))
-    return urls
+    ret = []
+    for urls in args:
+        ret.extend(urls)
+    return ret
