@@ -1,6 +1,13 @@
 """SCRUD DJANGO URL Configuration."""
+from django.db.utils import OperationalError
 from django.urls import path
 
+from scrud_django.registration import (
+    JSON_LD_REGISTRATION_,
+    JSON_SCHEMA_REGISTRATION_,
+    register_json_ld_resource_type,
+    register_json_schema_resource_type,
+)
 from scrud_django.views import (
     ResourceCollectionContextView,
     ResourceCollectionSchemaView,
@@ -18,3 +25,13 @@ urlpatterns = [
         name="collections-json-ld",
     ),
 ]
+
+try:
+    register_json_schema_resource_type()
+    register_json_ld_resource_type()
+    urlpatterns.extend(JSON_SCHEMA_REGISTRATION_.urls)
+    urlpatterns.extend(JSON_LD_REGISTRATION_.urls)
+except OperationalError as e:
+    import logging
+
+    logging.error(e)

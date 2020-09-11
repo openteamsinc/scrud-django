@@ -1,137 +1,71 @@
+import logging
 from datetime import datetime
-from typing import Dict, List
 from uuid import uuid4
 
-import yaml
 from django.db import transaction
 from django.shortcuts import get_object_or_404
-from django.urls import include, path
+from django.urls import path
 
 from scrud_django.models import Resource, ResourceType
 
 
 class ResourceTypeRegistration:
-    data_source: Dict = {}
-    resource_type_list: List[ResourceType] = []
-    urls: List[str] = []
-
-    def __init__(self, yaml_path):
-        with open(yaml_path) as f:
-            self.data_source = yaml.load(f, Loader=yaml.FullLoader)
-
-        # force a creation of a new list
-        self.resource_type_list = []
-
-        for k, v in self.data_source.items():
-            self.register_model(
-                json_schema_url=v['json_schema_url'],
-                json_ld_context_url=v['json_ld_context_url'],
-                rdf_type_uri=v['rdf_type_uri'],
-                slug=k,
-            )
-        self.register_urls()
-
-    def register_model(
+    def __init__(
         self,
-        json_schema_url: str,
-        json_ld_context_url: str,
-        rdf_type_uri: str,
-        slug: str,
+        resource_type_uri: str,
+        schema_resource: Resource = None,
+        schema_uri: str = None,
+        context_resource: Resource = None,
+        context_uri: str = None,
+        slug: str = None,
     ):
         """
         Register resource type model.
-
-        Parameters
-        ----------
-        json_schema_url : str
-        json_ld_context_url : str
-        rdf_type_uri : str
-        slug : str
-
         """
-        data = dict(
-            schema_uri=json_schema_url,
-            context_uri=json_ld_context_url,
-            type_uri=rdf_type_uri,
-            slug=slug,
-        )
-
-        search = ResourceType.objects.filter(**data)
+        search = ResourceType.objects.filter(type_uri=resource_type_uri)
         if search:
-            self.resource_type_list.append(search[0])
-            return
-
-        rt = ResourceType(**data)
-        rt.etag = uuid4().hex
-        rt.modified_at = datetime.now()
-        rt.save()
-        self.resource_type_list.append(rt)
+            self.resource_type = search[0]
+        else:
+            resource_type = ResourceType(
+                type_uri=resource_type_uri,
+                schema=schema_resource,
+                schema_uri=schema_uri,
+                context=context_resource,
+                context_uri=context_uri,
+                slug=slug,
+                etag=uuid4().hex,
+                modified_at=datetime.now(),
+            )
+            resource_type.save()
+            self.resource_type = resource_type
+        self.register_urls()
 
     def register_urls(self):
         """Register resource type url."""
         from scrud_django import views
 
-        # json-schema
-        json_schema_list = views.JSONSchemaViewSet.as_view(
-            {'get': 'list', 'post': 'create'}
+        scrud_list = views.ResourceViewSet.as_view(
+            {'get': 'list', 'post': 'create'},
+            resource_type_name=self.resource_type.slug,
         )
-        json_schema_detail = views.JSONSchemaViewSet.as_view(
-            {'get': 'retrieve'}
+        scrud_detail = views.ResourceViewSet.as_view(
+            {'get': 'retrieve', 'put': 'update', 'delete': 'destroy'},
+            resource_type_name=self.resource_type.slug,
         )
-
-        # json-ld
-        json_ld_list = views.JSONLDViewSet.as_view(
-            {'get': 'list', 'post': 'create'}
-        )
-        json_ld_detail = views.JSONLDViewSet.as_view({'get': 'retrieve'})
-
-        urls = [
-            path("", include("scrud_django.urls")),
-            path('json-schema/', json_schema_list, name='json-schema-list'),
+        self.urls = [
             path(
-                'json-schema/<str:slug>/',
-                json_schema_detail,
-                name='json-schema-detail',
+                f'{self.resource_type.slug}/',
+                scrud_list,
+                # name=f'{resource_type.slug}-list',
+                name=self.resource_type.route_name_list(),
             ),
-            # JSON LD
-            path('json-ld/', json_ld_list, name='json-ld-list'),
             path(
-                'json-ld/<str:slug>/', json_ld_detail, name='json-ld-detail',
+                f'{self.resource_type.slug}/<str:slug>/',
+                scrud_detail,
+                # name=f'{resource_type.slug}-detail',
+                name=self.resource_type.route_name_detail(),
             ),
         ]
-
-        for resource_type in self.resource_type_list:
-            # scrud
-            scrud_list = views.ResourceViewSet.as_view(
-                {'get': 'list', 'post': 'create'},
-                resource_type_name=resource_type.slug,
-            )
-            scrud_detail = views.ResourceViewSet.as_view(
-                {'get': 'retrieve', 'put': 'update', 'delete': 'destroy'},
-                resource_type_name=resource_type.slug,
-            )
-
-            # JSON SCHEMA
-
-            # SCRUD, note: it should be at the end of the list
-            # note: it maybe
-            urls.append(
-                path(
-                    f'{resource_type.slug}/',
-                    scrud_list,
-                    # name=f'{resource_type.slug}-list',
-                    name=resource_type.route_name_list(),
-                ),
-            )
-            urls.append(
-                path(
-                    f'{resource_type.slug}/<str:slug>/',
-                    scrud_detail,
-                    # name=f'{resource_type.slug}-detail',
-                    name=resource_type.route_name_detail(),
-                )
-            )
-        self.urls = urls
 
 
 class ResourceRegistration:
@@ -220,3 +154,93 @@ class ResourceRegistration:
             resource_type.etag = uuid4().hex
             resource_type.modified_at = datetime.now()
             resource_type.save()
+
+
+JSON_SCHEMA_REGISTRATION_ = None
+JSON_SCHEMA_RESOURCE_TYPE_ = None
+JSON_LD_RESOURCE_TYPE_ = None
+JSON_LD_REGISTRATION_ = None
+
+
+def register_json_schema_resource_type():
+    global JSON_SCHEMA_RESOURCE_TYPE_
+    global JSON_SCHEMA_REGISTRATION_
+    if JSON_SCHEMA_RESOURCE_TYPE_ is None:
+        JSON_SCHEMA_REGISTRATION_ = ResourceTypeRegistration(
+            resource_type_uri="http://json-schema.org/draft-04/schema",
+            schema_uri="http://json-schema.org/draft-04/schema",
+            slug="json-schema",
+        )
+        JSON_SCHEMA_RESOURCE_TYPE_ = JSON_SCHEMA_REGISTRATION_.resource_type
+    return JSON_SCHEMA_RESOURCE_TYPE_
+
+
+def register_json_ld_resource_type():
+    global JSON_LD_RESOURCE_TYPE_
+    global JSON_LD_REGISTRATION_
+    if JSON_LD_RESOURCE_TYPE_ is None:
+        JSON_LD_REGISTRATION_ = ResourceTypeRegistration(
+            resource_type_uri="http://www.w3.org/ns/json-ld#context",
+            slug="json-ld",
+        )
+        JSON_LD_RESOURCE_TYPE_ = JSON_LD_REGISTRATION_.resource_type
+    return JSON_LD_RESOURCE_TYPE_
+
+
+def register_file(file_to_register, resource_type):
+    resource = None
+    try:
+        contents = file_to_register.read()
+        resource = ResourceRegistration.register(contents, resource_type.slug)
+    except Exception as e:
+        logging.error(e)
+    finally:
+        file_to_register.close()
+    return resource
+
+
+def register_json_schema(schema_file):
+    resource_type = register_json_schema_resource_type()
+    return register_file(schema_file, resource_type)
+
+
+def register_json_ld_context(context_file):
+    resource_type = register_json_ld_resource_type()
+    return register_file(context_file, resource_type)
+
+
+def json_resource_type(
+    resource_type_uri: str,
+    schema_resource: Resource = None,
+    schema_file=None,
+    schema_uri: str = None,
+    context_resource: Resource = None,
+    context_file=None,
+    context_uri: str = None,
+):
+    """Registration of a single json resource type. Callers **should** provide one and
+    only one of `schema_resource, schema_file, schema_uri` as well as one and only  one
+    of `context_resource, context_file, context_uri`.
+    """
+    if schema_resource is None and schema_file is not None:
+        schema_resource = register_json_schema(schema_file)
+    if context_resource is None and context_file is not None:
+        context_resource = register_json_ld_context(context_file)
+    resource_type_registration = ResourceTypeRegistration(
+        resource_type_uri,
+        schema_resource=schema_resource,
+        schema_uri=schema_uri,
+        context_resource=context_resource,
+        context_uri=context_uri,
+    )
+    return resource_type_registration.urls
+
+
+def json_resource_types(configuration_dict):
+    """Registration of multiple resource types.
+    resource_type_uri -> configuration
+    """
+    urls = []
+    for resource_type_uri, configuration in configuration_dict.items():
+        urls.extend(json_resource_type(resource_type_uri, **configuration))
+    return urls
