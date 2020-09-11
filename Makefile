@@ -65,7 +65,6 @@ run_tests:
 	# AttributeError: The step `get` couldn't be found for the prefix type `Http`
 	pytest -vv tests/test_models.py
 	pytest -vv tests/test_rest.py
-	pytest -vv tests/test_registration.py
 
 # LINTER AND CODE CHECKING
 pre_commit_check:
