@@ -1,5 +1,8 @@
+import importlib
 import os
 import sys
+
+import pytest
 
 
 def pytest_addoption(parser):
@@ -79,3 +82,24 @@ def pytest_configure(config):
         django.setup()
     except AttributeError:
         pass
+
+
+@pytest.fixture(scope="session")
+def django_db_setup(django_db_setup, django_db_blocker):
+    """Ensure that the partner-profiles resource type is properly initialized for all
+    tests.
+    """
+    from scrud_django.registration import json_resource_type
+
+    with django_db_blocker.unblock():
+        json_resource_type(
+            resource_type_uri="tests://PartnerProfiles",
+            revision="1",
+            slug="partner-profiles",
+            schema_func=lambda: importlib.resources.read_text(
+                "tests.static.json_schema", "PartnerProfile"
+            ),
+            context_func=lambda: importlib.resources.read_text(
+                "tests.static.json_ld", "PartnerProfile"
+            ),
+        )
