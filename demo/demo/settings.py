@@ -55,6 +55,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
 ]
 
 ROOT_URLCONF = 'demo.urls'
@@ -132,9 +133,24 @@ STATIC_URL = '/static/'
 CORS_ORIGIN_WHITELIST = config(
     "CORS_ORIGIN_WHITELIST",
     cast=Csv(),
-    default="http://127.0.0.1:8000, http://localhost:8000, http://0.0.0.0:8000",
+    default='''http://127.0.0.1:8000, http://localhost:8000, http://0.0.0.0:8000,
+        http://127.0.0.1:3000, http://localhost:3000, http://0.0.0.0:3000''',
 )
+
 CORS_ALLOW_HEADERS = [
     *default_headers,
     "x-timezone",
+    "If-Unmodified-Since",
+    "If-Match",
+    "Cache-Control",
 ]
+
+CORS_EXPOSE_HEADERS = ["ETag", "Link"]
+
+CORS_ALLOWED_ORIGINS = ["http://localhost:3000/", "http://127.0.0.1:3000/"]
+
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^http://[1-z.0-9]+\.*(:3000)/$",
+]
+
+CORS_ALLOW_ALL_ORIGINS = True
