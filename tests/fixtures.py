@@ -10,7 +10,6 @@ from .factories import UserFactory
 __all__ = [
     'ROOT_PATH',
     'DATA_PATH',
-    'REGISTRATION_FILE_PATH',
     'regular_login',
     'admin_login',
     'http_static_server',
@@ -19,9 +18,6 @@ __all__ = [
 
 ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
 DATA_PATH = os.path.join(ROOT_PATH, 'data')
-REGISTRATION_FILE_PATH = registration_file = os.path.join(
-    ROOT_PATH, 'scrud-registration.yml'
-)
 
 
 @pytest.mark.django_db
