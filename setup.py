@@ -43,7 +43,7 @@ with open('README.md', 'r') as f:
     long_description = f.read()
 
 setup(
-    name='scrub-django',
+    name='scrud-django',
     version='0.1',
     description='A Django app for Semantic CRUD.',
     long_description=long_description,

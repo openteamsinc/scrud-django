@@ -140,3 +140,9 @@ db.sqlite*
 # vim swapfiles
 .*.sw*
 *.sw*
+
+.idea/
+
+*.sqlite3
+
+scrud-registration.yml

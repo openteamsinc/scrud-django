@@ -200,6 +200,20 @@ def scrudful(
     return decorator
 
 
+def scrudful_api_view(
+    etag_func=None,
+    last_modified_func=None,
+    schema_link_or_func=None,
+    schema_rel_or_func=None,
+    schema_type_or_func=None,
+    context_link_or_func=None,
+    context_rel_or_func=None,
+    context_type_or_func=None,
+    http_schema_or_func=None,
+):
+    pass
+
+
 class ScrudfulMetadata(BaseMetadata):
     def determine_metadata(self, request, view, *args, **kwargs):
         if len(args) > 0 or len(kwargs) > 0:  # this is a detail request
@@ -390,7 +404,7 @@ def scrudful_viewset(cls):
         context_type_or_func=context_type_or_func,
     )
     for method_name in ("create", "retrieve", "update", "destroy"):
-        method = getattr(cls, method_name)
+        method = getattr(cls, method_name, None)
         setattr(cls, method_name, scrudful_item(method))
     if hasattr(cls, "list"):
         scrudful_list = scrudful(
