@@ -107,7 +107,7 @@ def test_resource_post(admin_login, partner_profile_post_data):
         data=json.dumps(partner_profile_post_data),
         content_type='application/json',
     )
-    Then.http.status_code_is(status.HTTP_200_OK)
+    Then.http.status_code_is(status.HTTP_201_CREATED)
     And.http.content_type_is('application/json')
     And.http.resource_json_is(serialized_data)
 
