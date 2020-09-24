@@ -148,7 +148,9 @@ class ResourceViewSet(viewsets.ModelViewSet):
                 request=request,
             )
         }
-        return Response(serializer.data, headers=headers)
+        return Response(
+            serializer.data, headers=headers, status=status.HTTP_201_CREATED
+        )
 
     def update(self, request, slug: str):
         """Update a Resource."""
