@@ -6,7 +6,8 @@ import pytest
 from django.urls import reverse
 from django.utils.http import http_date, quote_etag
 from rest_framework import status
-from safetydance_django.test import Http, http, http_response  # noqa: F401
+from safetydance_django.test import *  # noqa: F403, F401
+from safetydance_django.test import http_response
 from safetydance_test import And, Given, Then, scripted_test
 
 from scrud_django.registration import ResourceRegistration
