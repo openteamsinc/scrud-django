@@ -145,7 +145,7 @@ CORS_ALLOW_HEADERS = [
     "Cache-Control",
 ]
 
-CORS_EXPOSE_HEADERS = ["ETag", "Link"]
+CORS_EXPOSE_HEADERS = ["ETag", "Link", "Location"]
 
 CORS_ALLOWED_ORIGINS = ["http://localhost:3000/", "http://127.0.0.1:3000/"]
 

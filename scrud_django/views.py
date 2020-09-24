@@ -141,7 +141,16 @@ class ResourceViewSet(viewsets.ModelViewSet):
             content=request.data, register_type=self.resource_type_name
         )
         serializer = self.get_serializer(instance=instance, many=False)
-        return Response(serializer.data)
+        headers = {
+            'Location': reverse_lazy(
+                instance.resource_type.route_name_detail(),
+                args=[instance.id],
+                request=request,
+            )
+        }
+        return Response(
+            serializer.data, headers=headers, status=status.HTTP_201_CREATED
+        )
 
     def update(self, request, slug: str):
         """Update a Resource."""
