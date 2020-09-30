@@ -6,6 +6,7 @@ from scrud_django import registration
 
 urlpatterns = [
     path("", include("scrud_django.urls")),
+    path("", include("partner_applications.urls")),
 ]
 urlpatterns.extend(
     registration.resource_types(
