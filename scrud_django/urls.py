@@ -8,15 +8,11 @@ from scrud_django import registration
 from scrud_django.views import (
     ResourceCollectionContextView,
     ResourceCollectionSchemaView,
-    ServiceCatalogView,
+    get_service_list,
 )
 
 urlpatterns = [
-    path(
-        "services/",
-        ServiceCatalogView.as_view({'get': 'get'}),
-        name="services",
-    ),
+    path("services/", get_service_list, name="services"),
     path(
         "collections-json-schema/<str:slug>/",
         ResourceCollectionSchemaView.as_view(),

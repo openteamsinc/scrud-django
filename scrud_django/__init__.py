@@ -14,12 +14,13 @@ class ScrudServices:
 
     def __init__(self):
         self.update_last_modified()
+        print(F"Initializing services - last modified = {self.last_modified}")
         self.services = {}
 
     def _set_etag(self):
         self.etag = base64.b64encode(
             self.last_modified.isoformat().encode('utf-8')
-        )
+        ).decode('utf-8')
 
     def update_last_modified(self):
         self.last_modified = ddt.now()
@@ -28,6 +29,12 @@ class ScrudServices:
     def add_service(self, key, value):
         self.services[key] = value
         self.update_last_modified()
+
+    def get_last_modified(self):
+        return self.last_modified
+
+    def get_etag(self):
+        return self.etag
 
 
 services = ScrudServices()
