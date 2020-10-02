@@ -198,8 +198,17 @@ def scrudful_api_view(
             'metadata_class': ScrudfulAPIViewMetadata,
         }
 
-        def handler(self, *args, **kwargs):
-            return view_method(*args, **kwargs)
+        handler = ScrudfulViewFunc(
+            lambda self, *args, **kwargs: view_method(*args, **kwargs),
+            etag_func=etag_func,
+            last_modified_func=last_modified_func,
+            schema_link_or_func=schema_link_or_func,
+            schema_rel_or_func=schema_rel_or_func,
+            schema_type_or_func=schema_type_or_func,
+            context_link_or_func=context_link_or_func,
+            context_rel_or_func=context_rel_or_func,
+            context_type_or_func=context_type_or_func,
+        )
 
         for method in http_method_names:
             cls_attr[method.lower()] = handler
@@ -224,19 +233,7 @@ def scrudful_api_view(
 
         new_view_method = ScrudAPIView.as_view()
 
-        return ScrudfulViewFunc(
-            new_view_method,
-            view_is_class_method=False,
-            etag_func=etag_func,
-            last_modified_func=last_modified_func,
-            schema_link_or_func=schema_link_or_func,
-            schema_rel_or_func=schema_rel_or_func,
-            schema_type_or_func=schema_type_or_func,
-            context_link_or_func=context_link_or_func,
-            context_rel_or_func=schema_rel_or_func,
-            context_type_or_func=schema_type_or_func,
-            http_schema_or_func=http_schema_or_func,
-        )
+        return new_view_method
 
     return decorator
 
@@ -428,13 +425,6 @@ class ScrudfulAPIViewMetadata(ScrudfulMetadata):
             }
         )
         return metadata
-
-    def get_method(self, view, name):
-        method_partial = getattr(view, name, None)
-        return method_partial.__self__
-        # if method_partial:
-        #     return method_partial.func.__self__
-        # return None
 
 
 def options(view_instance, request, *args, **kwargs):

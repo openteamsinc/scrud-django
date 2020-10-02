@@ -358,11 +358,11 @@ class ResourceCollectionContextView(APIView):
 
 
 @scrudful_api_view(
-    etag_func=lambda request: services.etag,
-    last_modified_func=lambda request: services.last_modified,
+    etag_func=lambda *args, **kwargs: services.etag,
+    last_modified_func=lambda *args, **kwargs: services.last_modified,
 )
 @permission_classes([AllowAny])
-def get_service_list(request):
+def get_service_list(request, *args, **kwargs):
     catalog = {}
     for k, v in services.services.items():
         catalog[k] = request.build_absolute_uri(f'/{v}/')
