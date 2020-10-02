@@ -4,9 +4,9 @@ from functools import partial, update_wrapper
 from django.utils.cache import get_conditional_response
 from django.utils.http import quote_etag
 from rest_framework import status
-from rest_framework.views import APIView
 from rest_framework.metadata import BaseMetadata
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from scrud_django.utils import get_string_or_evaluate, link_content
 
@@ -195,7 +195,7 @@ def scrudful_api_view(
 
         cls_attr = {
             '__doc__': view_method.__doc__,
-            'metadata_class': ScrudfulAPIViewMetadata
+            'metadata_class': ScrudfulAPIViewMetadata,
         }
 
         def handler(self, *args, **kwargs):
@@ -204,24 +204,23 @@ def scrudful_api_view(
         for method in http_method_names:
             cls_attr[method.lower()] = handler
 
-        ScrudAPIView = type(
-            'ScrudAPIView',
-            (APIView,),
-            cls_attr
-        )
+        ScrudAPIView = type('ScrudAPIView', (APIView,), cls_attr)
 
-        ScrudAPIView.http_method_names = [method.lower() for method in allowed_methods]
-
+        ScrudAPIView.http_method_names = [
+            method.lower() for method in allowed_methods
+        ]
 
         ScrudAPIView.__name__ = view_method.__name__
         ScrudAPIView.__module__ = view_method.__module__
 
-        ScrudAPIView.permission_classes = getattr(view_method, 'permission_classes', APIView.permission_classes)
+        ScrudAPIView.permission_classes = getattr(
+            view_method, 'permission_classes', APIView.permission_classes
+        )
         ScrudAPIView.schema = getattr(view_method, 'schema', APIView.schema)
         ScrudAPIView.schema_link_or_func = schema_link_or_func
         ScrudAPIView.context_link_or_func = context_link_or_func
 
-        #ScrudAPIView.options = options
+        # ScrudAPIView.options = options
 
         new_view_method = ScrudAPIView.as_view()
 
@@ -395,7 +394,7 @@ class ScrudfulMetadata(BaseMetadata):
     def determine_metadata_for_delete(self, request, view, name="destroy"):
         delete_method = self.get_method(view, name)
         if delete_method is None:
-                return None
+            return None
         metadata = {
             "responses": {"200": {"description": "OK"}},
         }
@@ -412,17 +411,19 @@ class ScrudfulAPIViewMetadata(ScrudfulMetadata):
             {
                 key: value
                 for key, value in {
-                "get": self.determine_metadata_for_get(
-                    request, view, "get"
-                ),
-                "post": self.determine_metadata_for_post(
-                    request, view, "post"
-                ),
-                "put": self.determine_metadata_for_put(request, view, "put"),
-                "delete": self.determine_metadata_for_delete(
-                    request, view, "delete"
-                ),
-            }.items()
+                    "get": self.determine_metadata_for_get(
+                        request, view, "get"
+                    ),
+                    "post": self.determine_metadata_for_post(
+                        request, view, "post"
+                    ),
+                    "put": self.determine_metadata_for_put(
+                        request, view, "put"
+                    ),
+                    "delete": self.determine_metadata_for_delete(
+                        request, view, "delete"
+                    ),
+                }.items()
                 if value is not None
             }
         )
