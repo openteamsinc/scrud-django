@@ -1,4 +1,4 @@
-import importlib
+import importlib.resources
 
 from django.urls import include, path
 

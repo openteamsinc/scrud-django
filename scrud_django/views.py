@@ -367,24 +367,3 @@ def get_service_list(request, *args, **kwargs):
     for k, v in services.services.items():
         catalog[k] = request.build_absolute_uri(f'/{v}/')
     return Response(catalog)
-
-
-@scrudful_viewset
-class ServiceCatalogView(viewsets.ModelViewSet):
-    queryset = ResourceType.objects.all()
-
-    class Meta:
-        def etag_func(self, request):
-            return services.etag
-
-        def last_modified_func(self, request):
-            return services.last_modified
-
-    def _get_service_list(self, request):
-        catalog = {}
-        for k, v in services.services.items():
-            catalog[k] = request.build_absolute_uri(f'/{v}/')
-        return catalog
-
-    def get(self, request):
-        return Response(self._get_service_list(request))
