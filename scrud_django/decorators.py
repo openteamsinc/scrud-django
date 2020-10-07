@@ -6,6 +6,7 @@ from django.utils.http import quote_etag
 from rest_framework import status
 from rest_framework.metadata import BaseMetadata
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from scrud_django.utils import get_string_or_evaluate, link_content
 
@@ -14,6 +15,7 @@ class ScrudfulViewFunc:
     def __init__(
         self,
         view_method,
+        view_is_class_method=True,
         etag_func=None,
         last_modified_func=None,
         schema_link_or_func=None,
@@ -24,6 +26,7 @@ class ScrudfulViewFunc:
         context_type_or_func=None,
         http_schema_or_func=None,
     ):
+        self.view_is_class_method = view_is_class_method
         self.view_method = view_method
         self.etag_func = etag_func
         self.last_modified_func = last_modified_func
@@ -39,7 +42,11 @@ class ScrudfulViewFunc:
     def __get__(self, obj, objtype):
         return partial(self.__call__, obj)
 
-    def __call__(self, view_instance, request, *args, **kwargs):
+    def __call__(self, *args, **kwargs):
+        if self.view_is_class_method:
+            request = args[1]
+        else:
+            request = args[0]
         if request.method in ("PUT", "DELETE"):
             missing_required_headers = []
             if self.etag_func and not request.META.get("HTTP_IF_MATCH"):
@@ -59,9 +66,7 @@ class ScrudfulViewFunc:
         # Compute values (if any) for the requested resource.
         def get_last_modified():
             if self.last_modified_func:
-                last_modified = self.last_modified_func(
-                    view_instance, request, *args, **kwargs
-                )
+                last_modified = self.last_modified_func(*args, **kwargs)
                 if last_modified:
                     return last_modified.replace(
                         tzinfo=timezone.utc
@@ -72,7 +77,7 @@ class ScrudfulViewFunc:
         last_modified = None
         if request.method not in ("POST", "OPTIONS"):
             if self.etag_func:
-                etag = self.etag_func(view_instance, request, *args, **kwargs)
+                etag = self.etag_func(*args, **kwargs)
             etag = quote_etag(etag) if etag else None
             last_modified = get_last_modified()
         else:
@@ -82,21 +87,9 @@ class ScrudfulViewFunc:
             request, etag=etag, last_modified=last_modified
         )
         if response is None:
-            response = self.view_method(
-                view_instance, request, *args, **kwargs
-            )
-            schema_link = (
-                self.schema_link_header(
-                    view_instance, request, *args, **kwargs
-                )
-                or ""
-            )
-            context_link = (
-                self.context_link_header(
-                    view_instance, request, *args, **kwargs
-                )
-                or ""
-            )
+            response = self.view_method(*args, **kwargs)
+            schema_link = self.schema_link_header(*args, **kwargs) or ""
+            context_link = self.context_link_header(*args, **kwargs) or ""
             join_links = ", " if schema_link and context_link else ""
             link_content = schema_link + join_links + context_link
             if etag:
@@ -107,62 +100,46 @@ class ScrudfulViewFunc:
                 response["Link"] = link_content
         return response
 
-    def schema_link(self, view_instance, request, *args, **kwargs):
+    def schema_link(self, *args, **kwargs):
         return get_string_or_evaluate(
-            self.schema_link_or_func, view_instance, request, *args, **kwargs
+            self.schema_link_or_func, *args, **kwargs
         )
 
-    def schema_link_header(self, view_instance, request, *args, **kwargs):
-        link = self.schema_link(view_instance, request, *args, **kwargs)
+    def schema_link_header(self, *args, **kwargs):
+        link = self.schema_link(*args, **kwargs)
         if link:
             link_rel = (
                 get_string_or_evaluate(
-                    self.schema_rel_or_func,
-                    view_instance,
-                    request,
-                    *args,
-                    **kwargs,
+                    self.schema_rel_or_func, *args, **kwargs,
                 )
                 or "describedBy"
             )
             link_type = (
                 get_string_or_evaluate(
-                    self.schema_type_or_func,
-                    view_instance,
-                    request,
-                    *args,
-                    **kwargs,
+                    self.schema_type_or_func, *args, **kwargs,
                 )
                 or "application/json"
             )
             return link_content(link, link_rel, link_type)
         return None
 
-    def context_link(self, view_instance, request, *args, **kwargs):
+    def context_link(self, *args, **kwargs):
         return get_string_or_evaluate(
-            self.context_link_or_func, view_instance, request, *args, **kwargs
+            self.context_link_or_func, *args, **kwargs
         )
 
-    def context_link_header(self, view_instance, request, *args, **kwargs):
-        link = self.context_link(view_instance, request, *args, **kwargs)
+    def context_link_header(self, *args, **kwargs):
+        link = self.context_link(*args, **kwargs)
         if link:
             link_rel = (
                 get_string_or_evaluate(
-                    self.context_rel_or_func,
-                    view_instance,
-                    request,
-                    *args,
-                    **kwargs,
+                    self.context_rel_or_func, *args, **kwargs,
                 )
                 or "http://www.w3.org/ns/json-ld#context"
             )
             link_type = (
                 get_string_or_evaluate(
-                    self.context_type_or_func,
-                    view_instance,
-                    request,
-                    *args,
-                    **kwargs,
+                    self.context_type_or_func, *args, **kwargs,
                 )
                 or "application/ld+json"
             )
@@ -196,6 +173,67 @@ def scrudful(
             context_type_or_func=schema_type_or_func,
             http_schema_or_func=http_schema_or_func,
         )
+
+    return decorator
+
+
+def scrudful_api_view(
+    etag_func=None,
+    last_modified_func=None,
+    schema_link_or_func=None,
+    schema_rel_or_func=None,
+    schema_type_or_func=None,
+    context_link_or_func=None,
+    context_rel_or_func=None,
+    context_type_or_func=None,
+    http_schema_or_func=['GET'],
+):
+    def decorator(view_method, *args, **kwargs):
+
+        http_method_names = http_schema_or_func
+        allowed_methods = set(http_method_names) | {'options'}
+
+        cls_attr = {
+            '__doc__': view_method.__doc__,
+            'metadata_class': ScrudfulAPIViewMetadata,
+        }
+
+        handler = ScrudfulViewFunc(
+            lambda self, *args, **kwargs: view_method(*args, **kwargs),
+            etag_func=etag_func,
+            last_modified_func=last_modified_func,
+            schema_link_or_func=schema_link_or_func,
+            schema_rel_or_func=schema_rel_or_func,
+            schema_type_or_func=schema_type_or_func,
+            context_link_or_func=context_link_or_func,
+            context_rel_or_func=context_rel_or_func,
+            context_type_or_func=context_type_or_func,
+        )
+
+        for method in http_method_names:
+            cls_attr[method.lower()] = handler
+
+        ScrudAPIView = type('ScrudAPIView', (APIView,), cls_attr)
+
+        ScrudAPIView.http_method_names = [
+            method.lower() for method in allowed_methods
+        ]
+
+        ScrudAPIView.__name__ = view_method.__name__
+        ScrudAPIView.__module__ = view_method.__module__
+
+        ScrudAPIView.permission_classes = getattr(
+            view_method, 'permission_classes', APIView.permission_classes
+        )
+        ScrudAPIView.schema = getattr(view_method, 'schema', APIView.schema)
+        ScrudAPIView.schema_link_or_func = schema_link_or_func
+        ScrudAPIView.context_link_or_func = context_link_or_func
+
+        # ScrudAPIView.options = options
+
+        new_view_method = ScrudAPIView.as_view()
+
+        return new_view_method
 
     return decorator
 
@@ -247,8 +285,8 @@ class ScrudfulMetadata(BaseMetadata):
             return method_partial.func.__self__
         return None
 
-    def determine_metadata_for_post(self, request, view):
-        create_method = self.get_method(view, "create")
+    def determine_metadata_for_post(self, request, view, name="create"):
+        create_method = self.get_method(view, name)
         if create_method is None:
             return None
         schema_link = create_method.schema_link(view, request)
@@ -274,6 +312,8 @@ class ScrudfulMetadata(BaseMetadata):
 
     def determine_metadata_for_get(self, request, view, name):
         list_method = self.get_method(view, name)
+        if list_method is None:
+            return
         schema_link = list_method.schema_link(view, request)
         context_link = list_method.context_link(view, request)
         json_content = None
@@ -320,8 +360,8 @@ class ScrudfulMetadata(BaseMetadata):
                 )
         return parameters
 
-    def determine_metadata_for_put(self, request, view):
-        update_method = self.get_method(view, "update")
+    def determine_metadata_for_put(self, request, view, name="update"):
+        update_method = self.get_method(view, name)
         if update_method is None:
             return
         schema_link = update_method.schema_link(view, request)
@@ -348,8 +388,8 @@ class ScrudfulMetadata(BaseMetadata):
             metadata["parameters"] = parameters
         return metadata
 
-    def determine_metadata_for_delete(self, request, view):
-        delete_method = self.get_method(view, "destroy")
+    def determine_metadata_for_delete(self, request, view, name="destroy"):
+        delete_method = self.get_method(view, name)
         if delete_method is None:
             return None
         metadata = {
@@ -358,6 +398,32 @@ class ScrudfulMetadata(BaseMetadata):
         parameters = self.required_conditional_headers(delete_method)
         if parameters:
             metadata["parameters"] = parameters
+        return metadata
+
+
+class ScrudfulAPIViewMetadata(ScrudfulMetadata):
+    def determine_metadata(self, request, view, *args, **kwargs):
+        metadata = dict()
+        metadata.update(
+            {
+                key: value
+                for key, value in {
+                    "get": self.determine_metadata_for_get(
+                        request, view, "get"
+                    ),
+                    "post": self.determine_metadata_for_post(
+                        request, view, "post"
+                    ),
+                    "put": self.determine_metadata_for_put(
+                        request, view, "put"
+                    ),
+                    "delete": self.determine_metadata_for_delete(
+                        request, view, "delete"
+                    ),
+                }.items()
+                if value is not None
+            }
+        )
         return metadata
 
 
@@ -390,7 +456,7 @@ def scrudful_viewset(cls):
         context_type_or_func=context_type_or_func,
     )
     for method_name in ("create", "retrieve", "update", "destroy"):
-        method = getattr(cls, method_name)
+        method = getattr(cls, method_name, None)
         setattr(cls, method_name, scrudful_item(method))
     if hasattr(cls, "list"):
         scrudful_list = scrudful(

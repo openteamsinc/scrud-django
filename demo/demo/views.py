@@ -249,38 +249,3 @@ class PartnerProfileContext(ScrudfulJsonView):
                 },
             }
         )
-
-
-class ServiceCatalog(ScrudfulJsonView):
-    def etag(self, request):
-        return "1"
-
-    def last_modified(self, request):
-        return "Thu, 20 Aug 2020 00:00:00 GMT"
-
-    def schema_link_url(self, request):
-        return None
-
-    def context_link_url(self, request):
-        return None
-
-    def do_get(self, request, format=None):
-        return Response(
-            {
-                "https://api.openteams.com/json-schema/PartnerProfile": "/examples/PartnerProfile",  # noqa
-            }
-        )
-
-    def do_options(self, request, format=None):
-        return Response(
-            {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {"application/json": {}},
-                        },
-                    },
-                },
-            }
-        )
