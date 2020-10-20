@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from django.conf import settings
 from django.db import transaction
-from django.db.utils import OperationalError
+from django.db.utils import OperationalError, ProgrammingError
 from django.shortcuts import get_object_or_404
 from django.urls import path
 
@@ -261,7 +261,7 @@ def json_resource_type(
             context_uri=context_uri,
         )
         return resource_type_registration.urls
-    except OperationalError:
+    except (OperationalError, ProgrammingError):
         logging.warning(
             "Failed to register resource type due to OperationalError. "
             "This is expected for migrations."

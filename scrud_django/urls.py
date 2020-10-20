@@ -1,7 +1,7 @@
 """SCRUD DJANGO URL Configuration."""
 import logging
 
-from django.db.utils import OperationalError
+from django.db.utils import OperationalError, ProgrammingError
 from django.urls import path
 
 from scrud_django import registration
@@ -31,5 +31,5 @@ try:
     registration.register_json_ld_resource_type()
     urlpatterns.extend(registration.JSON_SCHEMA_REGISTRATION_.urls)
     urlpatterns.extend(registration.JSON_LD_REGISTRATION_.urls)
-except OperationalError as e:
+except (OperationalError, ProgrammingError) as e:
     logging.error(e)
