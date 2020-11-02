@@ -374,5 +374,5 @@ class ResourceCollectionContextView(APIView):
 def get_service_list(request, *args, **kwargs):
     catalog = {}
     for k, v in services.services.items():
-        catalog[k] = request.build_absolute_uri(f'/{v}/')
+        catalog[k] = reverse_lazy(f'{v}-list', request=request)
     return Response(catalog)
