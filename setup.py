@@ -54,7 +54,8 @@ setup(
     classifiers='''
         Environment :: Web Environment
         Framework :: Django
-        Framework :: Django :: 3.*
+        Framework :: Django :: 3.0
+        Framework :: Django :: 3.1
         Intended Audience :: Developers
         License :: OSI Approved :: BSD License
         Operating System :: OS Independent
