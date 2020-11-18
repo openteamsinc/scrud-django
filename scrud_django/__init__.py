@@ -6,7 +6,7 @@ import datetime
 
 from django.utils.timezone import datetime as ddt
 
-__version__ = '0.1.2'
+__version__ = '0.1.3'
 
 
 class ScrudServices:
