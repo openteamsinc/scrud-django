@@ -63,7 +63,7 @@ setup(
         Programming Language :: Python :: 3.7
         Topic :: Internet :: WWW/HTTP
         Topic :: Internet :: WWW/HTTP :: Dynamic Content
-    ''',
+    '''.splitlines(),
     include_package_data=True,
     packages=find_packages(include=['scrud_django']),
     install_requires=requirements,
