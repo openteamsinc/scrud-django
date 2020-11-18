@@ -6,7 +6,13 @@ from setuptools import find_packages, setup
 # with open('docs/release-notes.md') as history_file:
 #     history = history_file.read()
 
-requirements = ['django', 'djangorestframework', 'psycopg2', 'python-dotenv']
+requirements = [
+    'django',
+    'djangorestframework',
+    'jsonfield',
+    'psycopg2',
+    'python-dotenv',
+]
 dev_requirements = [
     # linter and tools
     'black',
