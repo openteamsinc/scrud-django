@@ -1,4 +1,0 @@
-partner-profiles:
-  json_schema_url: "http://localhost:8123/json-schema/PartnerProfile"
-  json_ld_context_url: "http://localhost:8123/json-ld/PartnerProfile"
-  rdf_type_uri: "http://localhost:8123/json-ld/PartnerProfile"
